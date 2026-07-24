@@ -16,3 +16,6 @@ docs/design/
 
 # 系统文件
 .DS_Store
+.claude/review-passed
+.claude/security-passed
+.claude/settings.local.json
