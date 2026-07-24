@@ -138,7 +138,7 @@ function findCheck(result: ReturnType<typeof evaluate>, ruleId: string) {
 describe("eu-msb 规则文件", () => {
   it("符合规则文件 schema 并携带指定模块版本", () => {
     expect(rulesFile.module).toBe("eu-msb");
-    expect(rulesFile.version).toBe("2026.07.1");
+    expect(rulesFile.version).toBe("2026.07.2");
     expect(rulesFile.rules).toHaveLength(triggerCases.length);
   });
 

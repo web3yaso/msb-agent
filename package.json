@@ -7,7 +7,9 @@
     "dev": "tsx watch src/index.ts",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "validate:rules": "node --import tsx scripts/validate-rules.ts",
+    "check:links": "node --import tsx scripts/check-rule-links.ts"
   },
   "dependencies": {
     "hono": "^4.0.0",
