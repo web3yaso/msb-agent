@@ -150,7 +150,21 @@ describe("规则 schemas", () => {
   });
 
   it("要求规则文件为非空规则数组", () => {
-    expect(RulesFileSchema.safeParse([validRule]).success).toBe(true);
-    expect(RulesFileSchema.safeParse([]).success).toBe(false);
+    expect(
+      RulesFileSchema.safeParse({
+        module: "us-msb",
+        version: "2026.07.1",
+        updated_at: "2026-07-24T00:00:00Z",
+        rules: [validRule],
+      }).success,
+    ).toBe(true);
+    expect(
+      RulesFileSchema.safeParse({
+        module: "us-msb",
+        version: "2026.07.1",
+        updated_at: "2026-07-24T00:00:00Z",
+        rules: [],
+      }).success,
+    ).toBe(false);
   });
 });

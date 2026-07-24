@@ -1,6 +1,13 @@
 import { z } from "zod";
 
-import { ActivitySchema, CountryCodeSchema, PartyRoleSchema } from "./common.js";
+import {
+  ActivitySchema,
+  CountryCodeSchema,
+  ModuleIdSchema,
+  ModuleVersionSchema,
+  PartyRoleSchema,
+  UtcDateTimeSchema,
+} from "./common.js";
 
 const RoleScopedCountrySchema = z.strictObject({
   role: PartyRoleSchema,
@@ -32,7 +39,12 @@ export const RuleSchema = z.strictObject({
   note: z.string().min(1),
 });
 
-export const RulesFileSchema = z.array(RuleSchema).min(1);
+export const RulesFileSchema = z.strictObject({
+  module: ModuleIdSchema,
+  version: ModuleVersionSchema,
+  updated_at: UtcDateTimeSchema,
+  rules: z.array(RuleSchema).min(1),
+});
 
 export type RuleWhen = z.infer<typeof RuleWhenSchema>;
 export type Rule = z.infer<typeof RuleSchema>;

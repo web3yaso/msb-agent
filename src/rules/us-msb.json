@@ -1,0 +1,106 @@
+{
+  "module": "us-msb",
+  "version": "2026.07.1",
+  "updated_at": "2026-07-24T00:00:00Z",
+  "rules": [
+    {
+      "id": "us-fincen-registration-money-transmission",
+      "when": {
+        "activity": ["money_transmission", "crypto_transfer"],
+        "party_country": "US"
+      },
+      "required_evidence": ["fincen_msb_registration"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "31 CFR § 1022.380",
+      "source_url": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1022",
+      "accessed_date": "2026-07-23",
+      "note": "货币传输业务无金额门槛；FinCEN 注册是联邦 BSA 登记，不替代州级经营许可"
+    },
+    {
+      "id": "us-fincen-registration-threshold-activities",
+      "when": {
+        "activity": ["currency_exchange", "check_cashing", "stored_value"],
+        "party_country": "US",
+        "amount_gte": 1000.000001
+      },
+      "required_evidence": ["fincen_msb_registration"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "31 CFR § 1010.100(ff)",
+      "source_url": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1010/section-1010.100",
+      "accessed_date": "2026-07-23",
+      "note": "法源门槛为同一人同一日一笔或多笔合计超过 1,000 美元；按设计 §4.3 使用 6 位 USDC 精度的单笔安全下界，单笔未达时输出 HOLD"
+    },
+    {
+      "id": "us-bsa-aml-program",
+      "when": {
+        "activity": [
+          "money_transmission",
+          "currency_exchange",
+          "stored_value",
+          "crypto_transfer",
+          "check_cashing"
+        ],
+        "party_country": "US"
+      },
+      "required_evidence": ["bsa_aml_program"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "31 CFR § 1022.210",
+      "source_url": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1022",
+      "accessed_date": "2026-07-23",
+      "note": "PASS 仅表示已提交书面 BSA/AML 计划证据，不表示该计划充分或业务整体合规"
+    },
+    {
+      "id": "us-sar-controls",
+      "when": {
+        "activity": [
+          "money_transmission",
+          "currency_exchange",
+          "stored_value",
+          "crypto_transfer",
+          "check_cashing"
+        ],
+        "party_country": "US"
+      },
+      "required_evidence": ["sar_monitoring_and_filing_controls"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "31 CFR § 1022.320",
+      "source_url": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1022",
+      "accessed_date": "2026-07-23",
+      "note": "本规则只检查 SAR 监测与申报控制证据是否存在；是否构成可疑交易不能由静态输入判定"
+    },
+    {
+      "id": "us-ny-money-transmitter-license",
+      "when": {
+        "activity": ["money_transmission"],
+        "party_country": "US",
+        "party_state": "NY"
+      },
+      "required_evidence": ["ny_money_transmitter_license"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "NY Banking Law Article 13-B",
+      "source_url": "https://www.nysenate.gov/legislation/laws/BNK",
+      "accessed_date": "2026-07-23",
+      "note": "纽约州汇款许可与 FinCEN 联邦注册是不同层级的要求"
+    },
+    {
+      "id": "us-ny-bitlicense",
+      "when": {
+        "activity": ["crypto_transfer", "stored_value"],
+        "party_country": "US",
+        "party_state": "NY"
+      },
+      "required_evidence": ["ny_bitlicense"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "23 NYCRR Part 200",
+      "source_url": "https://www.dfs.ny.gov/virtual_currency_businesses",
+      "accessed_date": "2026-07-23",
+      "note": "本检查仅确认纽约虚拟货币业务许可证据；具体活动是否落入豁免或其他许可路径需另行核实"
+    }
+  ]
+}
