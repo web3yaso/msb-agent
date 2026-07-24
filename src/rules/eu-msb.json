@@ -1,0 +1,127 @@
+{
+  "module": "eu-msb",
+  "version": "2026.07.1",
+  "updated_at": "2026-07-24T00:00:00Z",
+  "rules": [
+    {
+      "id": "eu-psd2-payment-institution-authorisation",
+      "when": {
+        "activity": ["money_transmission"]
+      },
+      "required_evidence": ["eu_payment_institution_authorisation"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Directive (EU) 2015/2366 (PSD2)",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=consolidation%3A2015L2366%2F20250117_0020010",
+      "accessed_date": "2026-07-23",
+      "note": "PASS 仅表示已提交欧盟支付机构授权证据；小型机构豁免、代理安排及跨境护照范围需按成员国落实情况另行核实"
+    },
+    {
+      "id": "eu-emd2-emoney-authorisation",
+      "when": {
+        "activity": ["stored_value"]
+      },
+      "required_evidence": ["eu_emoney_institution_authorisation"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Directive 2009/110/EC (EMD2)",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009L0110",
+      "accessed_date": "2026-07-23",
+      "note": "PASS 仅表示已提交电子货币机构授权证据，不判定具体 stored_value 产品是否满足电子货币定义或豁免"
+    },
+    {
+      "id": "eu-amld-policies-controls",
+      "when": {
+        "activity": ["money_transmission", "currency_exchange", "stored_value", "crypto_transfer"]
+      },
+      "required_evidence": ["eu_aml_policies_and_controls"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Directive (EU) 2015/849 (AMLD)",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32015L0849",
+      "accessed_date": "2026-07-23",
+      "note": "截至 2026-07-24，本规则以 AMLD 及成员国转化法的现行义务为基础；AMLR (EU) 2024/1624 主体条款自 2027-07-10 起适用"
+    },
+    {
+      "id": "eu-mica-casp-authorisation",
+      "when": {
+        "activity": ["crypto_transfer"]
+      },
+      "required_evidence": ["mica_casp_authorisation"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Regulation (EU) 2023/1114 (MiCA)",
+      "source_url": "https://eur-lex.europa.eu/eli/reg/2023/1114/oj?locale=en",
+      "accessed_date": "2026-07-23",
+      "note": "MiCA 自 2024-12-30 普遍适用；Article 143 的 CASP 最长过渡期截至 2026-07-01，成员国可缩短或不采用，故截至 2026-07-24 不再按该最长过渡期放行"
+    },
+    {
+      "id": "eu-transfer-information-controls",
+      "when": {
+        "activity": ["money_transmission", "crypto_transfer"]
+      },
+      "required_evidence": ["eu_transfer_information_controls"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Regulation (EU) 2023/1113",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32023R1113",
+      "accessed_date": "2026-07-23",
+      "note": "该条例自 2024-12-30 起适用；PASS 只表示已提交资金及加密资产转移信息控制证据，不判定具体转移是否落入例外"
+    },
+    {
+      "id": "eu-amlr-2027-applicability",
+      "when": {
+        "activity": ["money_transmission", "currency_exchange", "stored_value", "crypto_transfer"]
+      },
+      "required_evidence": [],
+      "result_if_missing": "ESCALATE",
+      "always_escalate": true,
+      "source": "Regulation (EU) 2024/1624 (AMLR)",
+      "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32024R1624",
+      "accessed_date": "2026-07-23",
+      "note": "AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规"
+    },
+    {
+      "id": "eu-de-bafin-payment-emoney-authorisation",
+      "when": {
+        "activity": ["money_transmission", "stored_value"],
+        "party_country": "DE"
+      },
+      "required_evidence": ["bafin_payment_or_emoney_authorisation"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "BaFin: Payment services licensing information",
+      "source_url": "https://www.bafin.de/EN/Aufsicht/FinTech/Kontaktformular/FAQ_Uebersicht/FAQ_Uebersicht_node_en.html",
+      "accessed_date": "2026-07-23",
+      "note": "德国检查项确认 BaFin 支付或电子货币许可/护照证据；具体 ZAG 许可类别与豁免需另行核实"
+    },
+    {
+      "id": "eu-fr-acpr-payment-emoney-authorisation",
+      "when": {
+        "activity": ["money_transmission", "stored_value"],
+        "party_country": "FR"
+      },
+      "required_evidence": ["acpr_payment_or_emoney_authorisation"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "ACPR: Payment institution authorisation",
+      "source_url": "https://acpr.banque-france.fr/en/node/26808",
+      "accessed_date": "2026-07-23",
+      "note": "法国检查项确认 ACPR 支付或电子货币机构许可/护照证据；简化许可与豁免条件需另行核实"
+    },
+    {
+      "id": "eu-nl-dnb-payment-emoney-authorisation",
+      "when": {
+        "activity": ["money_transmission", "stored_value"],
+        "party_country": "NL"
+      },
+      "required_evidence": ["dnb_payment_or_emoney_authorisation"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "DNB: Payment institutions public register",
+      "source_url": "https://www.dnb.nl/en/sector-information/open-book-supervision/open-book-supervision-sectors/payment-institutions/licensing-requirement-for-payment-service-providers-overview/the-public-register/",
+      "accessed_date": "2026-07-23",
+      "note": "荷兰检查项确认 DNB 支付或电子货币机构许可/护照登记证据；登记存在不等于本次活动必然在许可范围内"
+    }
+  ]
+}
