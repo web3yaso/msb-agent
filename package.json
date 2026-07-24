@@ -12,6 +12,7 @@
     "check:links": "node --import tsx scripts/check-rule-links.ts"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.14",
     "hono": "^4.0.0",
     "zod": "^4.0.0"
   },
