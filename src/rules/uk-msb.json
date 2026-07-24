@@ -1,0 +1,103 @@
+{
+  "module": "uk-msb",
+  "version": "2026.07.1",
+  "updated_at": "2026-07-24T00:00:00Z",
+  "rules": [
+    {
+      "id": "uk-fca-payment-institution-authorisation",
+      "when": {
+        "activity": ["money_transmission"],
+        "party_country": "GB"
+      },
+      "required_evidence": ["fca_payment_institution_authorisation_or_registration"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Payment Services Regulations 2017",
+      "source_url": "https://www.legislation.gov.uk/uksi/2017/752",
+      "accessed_date": "2026-07-23",
+      "note": "PASS 仅表示已提交 FCA 支付机构授权或注册证据；具体应适用授权还是小型支付机构注册路径需另行核实"
+    },
+    {
+      "id": "uk-fca-emoney-authorisation",
+      "when": {
+        "activity": ["stored_value"],
+        "party_country": "GB"
+      },
+      "required_evidence": ["fca_emoney_authorisation_or_registration"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Electronic Money Regulations 2011",
+      "source_url": "https://www.legislation.gov.uk/uksi/2011/99",
+      "accessed_date": "2026-07-23",
+      "note": "PASS 仅表示已提交 FCA 电子货币机构授权或注册证据，不判定具体业务是否构成电子货币发行"
+    },
+    {
+      "id": "uk-hmrc-aml-supervision",
+      "when": {
+        "activity": ["money_transmission", "currency_exchange", "check_cashing"],
+        "party_country": "GB"
+      },
+      "required_evidence": ["hmrc_aml_registration_or_fca_supervision"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "HMRC: Money laundering supervision for money service businesses",
+      "source_url": "https://www.gov.uk/guidance/money-laundering-regulations-money-service-business-registration",
+      "accessed_date": "2026-07-23",
+      "note": "已核实 GOV.UK 官方指引 URL；指引说明已受 FCA 监督的企业无需重复向 HMRC 登记，因此证据键允许 HMRC 登记或 FCA 监督二选一"
+    },
+    {
+      "id": "uk-mlr-policies-controls",
+      "when": {
+        "activity": [
+          "money_transmission",
+          "currency_exchange",
+          "stored_value",
+          "crypto_transfer",
+          "check_cashing"
+        ],
+        "party_country": "GB"
+      },
+      "required_evidence": ["uk_aml_policies_and_controls"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Money Laundering Regulations 2017",
+      "source_url": "https://www.legislation.gov.uk/uksi/2017/692",
+      "accessed_date": "2026-07-23",
+      "note": "PASS 仅表示已提交英国 AML 政策、控制与程序证据，不构成对其充分性或有效性的判断"
+    },
+    {
+      "id": "uk-poca-sar-controls",
+      "when": {
+        "activity": [
+          "money_transmission",
+          "currency_exchange",
+          "stored_value",
+          "crypto_transfer",
+          "check_cashing"
+        ],
+        "party_country": "GB"
+      },
+      "required_evidence": ["uk_sar_monitoring_and_reporting_controls"],
+      "result_if_missing": "HOLD",
+      "always_escalate": false,
+      "source": "Proceeds of Crime Act 2002",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2002/29",
+      "accessed_date": "2026-07-23",
+      "note": "本规则只检查可疑活动监测与报告控制证据；具体交易是否达到报告标准不能由静态输入判定"
+    },
+    {
+      "id": "uk-crypto-regulatory-perimeter",
+      "when": {
+        "activity": ["crypto_transfer"],
+        "party_country": "GB"
+      },
+      "required_evidence": [],
+      "result_if_missing": "ESCALATE",
+      "always_escalate": true,
+      "source": "Financial Services and Markets Act 2000",
+      "source_url": "https://www.legislation.gov.uk/ukpga/2000/8",
+      "accessed_date": "2026-07-23",
+      "note": "现有 when 无法表达代币性质、具体受规管活动、豁免和金融推广等监管边界，必须转人工核实"
+    }
+  ]
+}
