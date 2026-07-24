@@ -1,0 +1,18 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 凭证与环境
+.env
+.env.*
+*.pem
+
+# agent 流水线配置与本地状态（不入库，属于个人开发环境）
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+docs/design/
+
+# 系统文件
+.DS_Store
