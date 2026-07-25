@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "validate:rules": "node --import tsx scripts/validate-rules.ts",
-    "check:links": "node --import tsx scripts/check-rule-links.ts"
+    "check:links": "node --import tsx scripts/check-rule-links.ts",
+    "smoke:arc": "node --import tsx scripts/smoke-arc.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.14",
@@ -20,6 +21,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@circle-fin/x402-batching": "^3.2.0",
     "@eslint/js": "^9.0.0",
     "@types/node": "^22.0.0",
     "eslint": "^9.0.0",

@@ -7,6 +7,7 @@ export {
 } from "./config.js";
 export { getPaymentCredentialId, getPaymentRetryKey, PaidRetryStore } from "./idempotency.js";
 export {
+  createX402Price,
   createPaymentMiddlewares,
   type PaymentRequestState,
   type X402MiddlewareConfig,

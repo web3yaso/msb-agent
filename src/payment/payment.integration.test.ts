@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { evaluate } from "../engine/index.js";
 import { createApp } from "../http/app.js";
 import { ModuleResponseSchema } from "../schemas/index.js";
-import type { PaymentConfig, X402MiddlewareFactory } from "./index.js";
+import { createX402Price, type PaymentConfig, type X402MiddlewareFactory } from "./index.js";
 
 const PAY_TO = "0x1111111111111111111111111111111111111111";
 const paymentConfig: PaymentConfig = {
@@ -65,6 +65,29 @@ function paidRequest(): RequestInit {
 }
 
 describe("x402 支付层", () => {
+  it("Arc 使用 Circle GatewayWalletBatched AssetAmount，Base 保持美元价格", () => {
+    const commonConfig = {
+      facilitatorUrl: "https://facilitator.example.test",
+      moduleId: "us-msb",
+      path: "/modules/us-msb/check",
+      payTo: PAY_TO,
+      priceAtomic: "1000000",
+      priceUsdc: "1.000000",
+    } as const;
+
+    expect(createX402Price({ ...commonConfig, network: "arc-testnet" })).toEqual({
+      amount: "1000000",
+      asset: "0x3600000000000000000000000000000000000000",
+      extra: {
+        minValiditySeconds: 604800,
+        name: "GatewayWalletBatched",
+        verifyingContract: "0x0077777d7eba4688bdef3e311b846f25870a19b9",
+        version: "1",
+      },
+    });
+    expect(createX402Price({ ...commonConfig, network: "base-sepolia" })).toBe("$1.000000");
+  });
+
   it("base-sepolia 完成 402 → 支付 → 200", async () => {
     const chargeCount = { value: 0 };
     const app = await createApp({

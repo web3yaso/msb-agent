@@ -1,5 +1,5 @@
 import { HTTPFacilitatorClient } from "@x402/core/server";
-import type { Network } from "@x402/core/types";
+import type { Network, Price } from "@x402/core/types";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { paymentMiddlewareFromConfig } from "@x402/hono";
 import type { MiddlewareHandler } from "hono";
@@ -34,6 +34,26 @@ const X402_NETWORKS: Record<X402MiddlewareConfig["network"], Network> = {
   "arc-testnet": "eip155:5042002",
 };
 
+const ARC_TESTNET_USDC = "0x3600000000000000000000000000000000000000";
+
+// 来源：Circle hosted facilitator GET /supported（eip155:5042002 exact）。
+const ARC_GATEWAY_BATCHED_EXTRA = {
+  minValiditySeconds: 604_800,
+  name: "GatewayWalletBatched",
+  verifyingContract: "0x0077777d7eba4688bdef3e311b846f25870a19b9",
+  version: "1",
+} as const;
+
+export function createX402Price(config: X402MiddlewareConfig): Price {
+  return config.network === "arc-testnet"
+    ? {
+        amount: config.priceAtomic,
+        asset: ARC_TESTNET_USDC,
+        extra: ARC_GATEWAY_BATCHED_EXTRA,
+      }
+    : `$${config.priceUsdc}`;
+}
+
 function defaultX402MiddlewareFactory(config: X402MiddlewareConfig): MiddlewareHandler {
   const network = X402_NETWORKS[config.network];
   const facilitatorClient = new HTTPFacilitatorClient({ url: config.facilitatorUrl });
@@ -44,7 +64,7 @@ function defaultX402MiddlewareFactory(config: X402MiddlewareConfig): MiddlewareH
         accepts: {
           network,
           payTo: config.payTo,
-          price: `$${config.priceUsdc}`,
+          price: createX402Price(config),
           scheme: "exact",
         },
         description: `${config.moduleId} deterministic compliance check`,
