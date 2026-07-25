@@ -5,6 +5,7 @@ dist/
 # 凭证与环境
 .env
 .env.*
+!.env.example
 *.pem
 
 # agent 流水线配置与本地状态（不入库，属于个人开发环境）
