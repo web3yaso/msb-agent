@@ -119,6 +119,20 @@ describe("HTTP app", () => {
     expect(((await invalidResponse.json()) as ErrorResponse).error).toBe("invalid_request");
   });
 
+  it("check 请求体超过 256KB 时返回 413", async () => {
+    const response = await app.request("/modules/us-msb/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...completeUsInput,
+        evidence: { oversized: "x".repeat(256 * 1024) },
+      }),
+    });
+
+    expect(response.status).toBe(413);
+    expect(((await response.json()) as ErrorResponse).error).toBe("request_too_large");
+  });
+
   it.each([
     ["us-msb", "CA"],
     ["uk-msb", "US"],

@@ -1,6 +1,15 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 
 import { evaluate } from "../engine/index.js";
+import {
+  createPaymentMiddlewares,
+  loadPaymentConfig,
+  PaidRetryStore,
+  type PaymentConfig,
+  type PaymentRequestState,
+  type X402MiddlewareFactory,
+} from "../payment/index.js";
 import {
   ModuleIdSchema,
   ModuleResponseSchema,
@@ -20,7 +29,10 @@ const MODULE_MAINTAINER = "MSB Compliance Module Service";
 const RESULT_VALIDITY_MS = 72 * 60 * 60 * 1000;
 
 export interface CreateAppOptions {
+  evaluateRules?: typeof evaluate;
   now?: () => Date;
+  paymentConfig?: PaymentConfig;
+  x402MiddlewareFactory?: X402MiddlewareFactory;
 }
 
 function isPartyInJurisdiction(moduleId: ModuleId, input: DealInput): boolean {
@@ -73,7 +85,32 @@ function getModule(
 export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
   const modules = await loadModules();
   const now = options.now ?? (() => new Date());
+  const evaluateRules = options.evaluateRules ?? evaluate;
+  const paymentConfig = options.paymentConfig ?? loadPaymentConfig();
+  const retryStore = new PaidRetryStore(now);
+  const paymentRequestStates = new WeakMap<Request, PaymentRequestState>();
+  const paymentMiddlewares = await createPaymentMiddlewares(
+    paymentConfig,
+    paymentRequestStates,
+    retryStore,
+    options.x402MiddlewareFactory,
+  );
   const app = new Hono();
+
+  app.onError((error, context) => {
+    const paymentState = paymentRequestStates.get(context.req.raw);
+    return context.json(
+      {
+        error: "internal_error",
+        message: "检查执行失败，可使用同一支付凭证重试",
+        ...(paymentState?.credentialId === undefined
+          ? {}
+          : { payment_credential_id: paymentState.credentialId }),
+        disclaimer: DISCLAIMER,
+      },
+      500,
+    );
+  });
 
   app.get("/modules", (context) =>
     context.json({
@@ -99,7 +136,71 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
     });
   });
 
-  // 步骤 11 在此处为 check 路由接入 x402 支付中间件。
+  app.use(
+    "/modules/:id/check",
+    bodyLimit({
+      maxSize: 256 * 1024,
+      onError: (context) =>
+        context.json(
+          {
+            error: "request_too_large",
+            message: "请求体不得超过 256KB",
+            disclaimer: DISCLAIMER,
+          },
+          413,
+        ),
+    }),
+  );
+
+  // schema 与法域校验在收费前完成，避免无效请求进入支付流程。
+  app.use("/modules/:id/check", async (context, next) => {
+    const selectedModule = getModule(modules, context.req.param("id"));
+    if (selectedModule === undefined) {
+      await next();
+      return;
+    }
+
+    let requestBody: unknown;
+    try {
+      requestBody = await context.req.raw.clone().json();
+    } catch {
+      return context.json(
+        {
+          error: "invalid_request",
+          issues: [{ path: [], message: "请求体必须是有效 JSON" }],
+          disclaimer: DISCLAIMER,
+        },
+        400,
+      );
+    }
+    const parsedInput = selectedModule.module.inputSchema.safeParse(requestBody);
+    if (!parsedInput.success) {
+      return context.json(
+        {
+          error: "invalid_request",
+          issues: parsedInput.error.issues.map(({ path, message }) => ({ path, message })),
+          disclaimer: DISCLAIMER,
+        },
+        400,
+      );
+    }
+    if (!isPartyInJurisdiction(selectedModule.id, parsedInput.data)) {
+      return context.json(
+        {
+          error: "jurisdiction_not_applicable",
+          message: `全部交易方均不在 ${MODULE_JURISDICTIONS[selectedModule.id]} 模块适用法域内`,
+          disclaimer: DISCLAIMER,
+        },
+        422,
+      );
+    }
+    await next();
+  });
+
+  for (const [moduleId, paymentMiddleware] of Object.entries(paymentMiddlewares)) {
+    app.use(`/modules/${moduleId}/check`, paymentMiddleware);
+  }
+
   app.post("/modules/:id/check", async (context) => {
     const selectedModule = getModule(modules, context.req.param("id"));
     if (selectedModule === undefined) {
@@ -146,7 +247,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
       );
     }
 
-    const engineResult = evaluate(
+    const engineResult = evaluateRules(
       selectedModule.module.metadata.rules,
       parsedInput.data,
       selectedModule.module.rulesFileBytes,
