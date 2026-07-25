@@ -1,4 +1,5 @@
 import { once } from "node:events";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { GatewayClient } from "@circle-fin/x402-batching/client";
 import { serve, type ServerType } from "@hono/node-server";
@@ -11,6 +12,8 @@ import { ModuleIdSchema, ModuleResponseSchema, type ModuleId } from "../src/sche
 const DEFAULT_SMOKE_PORT = 4402;
 const DEFAULT_DEPOSIT_USDC = "1.50";
 const MINIMUM_GATEWAY_BALANCE = 1_050_000n;
+const DEPOSIT_POLL_INTERVAL_MS = 15_000;
+const DEPOSIT_POLL_MAX_ATTEMPTS = 24;
 
 const SMOKE_DEAL_INPUT = {
   deal_id: "arc-testnet-smoke",
@@ -103,6 +106,11 @@ async function runSmoke(): Promise<void> {
 
   const moduleId = getSmokeModule();
   const port = getSmokePort();
+  const forceDepositValue = (process.env.SMOKE_FORCE_DEPOSIT ?? "0").trim().toLowerCase();
+  if (!["0", "1", "false", "true"].includes(forceDepositValue)) {
+    throw new Error("SMOKE_FORCE_DEPOSIT 只接受 0、1、false 或 true");
+  }
+  const isForceDeposit = forceDepositValue === "1" || forceDepositValue === "true";
   const rpcUrl = process.env.SMOKE_ARC_RPC_URL?.trim();
   const gatewayClient = new GatewayClient({
     chain: "arcTestnet",
@@ -119,16 +127,49 @@ async function runSmoke(): Promise<void> {
   try {
     server = await startServer(port);
 
+    process.stdout.write("[1/5] balance: 查询 Gateway 可用余额\n");
     const balances = await gatewayClient.getBalances();
     process.stdout.write(
       `Gateway available balance: ${balances.gateway.formattedAvailable} USDC\n`,
     );
-    if (balances.gateway.available < MINIMUM_GATEWAY_BALANCE) {
-      const deposit = await gatewayClient.deposit(getDepositAmount());
+
+    const isDepositRequired =
+      isForceDeposit || balances.gateway.available < MINIMUM_GATEWAY_BALANCE;
+    if (isDepositRequired) {
+      const depositAmount = getDepositAmount();
+      const [wholeAmount = "0", fractionalAmount = ""] = depositAmount.split(".");
+      const depositAtomic = BigInt(`${wholeAmount}${fractionalAmount.padEnd(6, "0")}`);
+      const expectedAvailable = balances.gateway.available + depositAtomic;
+
+      process.stdout.write(
+        `[2/5] deposit: ${isForceDeposit ? "强制" : "余额不足，"}存入 ${depositAmount} USDC\n`,
+      );
+      const deposit = await gatewayClient.deposit(depositAmount);
       depositTransaction = deposit.depositTxHash;
       process.stdout.write(`Deposit transaction: ${depositTransaction}\n`);
+
+      let isDepositAvailable = false;
+      for (let attempt = 1; attempt <= DEPOSIT_POLL_MAX_ATTEMPTS; attempt += 1) {
+        await delay(DEPOSIT_POLL_INTERVAL_MS);
+        const updatedBalances = await gatewayClient.getBalances();
+        process.stdout.write(
+          `Deposit confirmation ${String(attempt)}/${String(DEPOSIT_POLL_MAX_ATTEMPTS)}: ${updatedBalances.gateway.formattedAvailable} USDC available\n`,
+        );
+        if (updatedBalances.gateway.available >= expectedAvailable) {
+          isDepositAvailable = true;
+          break;
+        }
+      }
+      if (!isDepositAvailable) {
+        throw new Error(
+          `存款等待超时：Gateway 可用余额未在 ${String(DEPOSIT_POLL_MAX_ATTEMPTS * 15)} 秒内增加 ${depositAmount} USDC`,
+        );
+      }
+    } else {
+      process.stdout.write("[2/5] deposit: skipped（余额充足且未强制存款）\n");
     }
 
+    process.stdout.write("[3/5] 402: 发送无支付凭证请求\n");
     const unpaidResponse = await fetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -149,6 +190,7 @@ async function runSmoke(): Promise<void> {
       `Payment requirements:\n${JSON.stringify(paymentRequired.accepts, null, 2)}\n`,
     );
 
+    process.stdout.write("[4/5] pay: Circle Gateway 签名并提交支付请求\n");
     const payment = await gatewayClient.pay(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -164,9 +206,7 @@ async function runSmoke(): Promise<void> {
     }
 
     const moduleResponse = ModuleResponseSchema.parse(payment.data);
-    if (depositTransaction === undefined) {
-      process.stdout.write("Deposit transaction: not required\n");
-    }
+    process.stdout.write("[5/5] 200: 支付与合规检查成功\n");
     process.stdout.write(`Payment settlement ID: ${payment.transaction}\n`);
     process.stdout.write(`evidence_hash: ${moduleResponse.evidence_hash}\n`);
     process.stdout.write(`overall: ${moduleResponse.overall}\n`);
