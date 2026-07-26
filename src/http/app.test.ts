@@ -90,9 +90,12 @@ describe("HTTP app", () => {
   it("GET agent card 免费返回 registration-v1，未注册时证明端点返回 404", async () => {
     const cardResponse = await app.request("/.well-known/agent-card.json");
     const card = (await cardResponse.json()) as {
+      active: boolean;
       type: string;
       disclaimer: string;
       description: string;
+      services: { name: string; endpoint: string; version: string }[];
+      x402Support: boolean;
     };
     const registrationResponse = await app.request("/.well-known/agent-registration.json");
 
@@ -102,6 +105,9 @@ describe("HTTP app", () => {
     expect(card.type).toBe("https://eips.ethereum.org/EIPS/eip-8004#registration-v1");
     expect(card.disclaimer).toBe(DISCLAIMER);
     expect(card.description).toContain(DISCLAIMER);
+    expect(card.services).toHaveLength(2);
+    expect(card.x402Support).toBe(true);
+    expect(card.active).toBe(true);
     expect(registrationResponse.status).toBe(404);
     expect(await registrationResponse.json()).toHaveProperty("disclaimer", DISCLAIMER);
   });

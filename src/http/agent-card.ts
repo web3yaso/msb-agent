@@ -79,10 +79,12 @@ export function buildAgentCard(input: AgentCardInput): Record<string, unknown> {
     name: AGENT_NAME,
     description: `${AGENT_SHORT_DESCRIPTION.replace(DISCLAIMER, "")}定价：${pricing} 测试网 USDC 每次调用。${DISCLAIMER}`,
     image: `${baseUrl}${AGENT_IMAGE_PATH}`,
-    endpoints: [
+    services: [
       { name: "web", endpoint: `${baseUrl}${AGENT_DOCS_PATH}`, version: SERVICE_VERSION },
       { name: "x402", endpoint: `${baseUrl}/modules`, version: "x402/2" },
     ],
+    x402Support: true,
+    active: true,
     supportedTrust: ["reputation"],
     ...(registration ?? {}),
     "x-msb": {

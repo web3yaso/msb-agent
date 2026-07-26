@@ -25,6 +25,13 @@ describe("agent card", () => {
     expect(card.type).toBe("https://eips.ethereum.org/EIPS/eip-8004#registration-v1");
     expect(card.disclaimer).toBe(DISCLAIMER);
     expect(card.description).toContain(DISCLAIMER);
+    expect(card.services).toEqual([
+      { name: "web", endpoint: "https://example.com/", version: "0.3.0" },
+      { name: "x402", endpoint: "https://example.com/modules", version: "x402/2" },
+    ]);
+    expect(card).not.toHaveProperty("endpoints");
+    expect(card.x402Support).toBe(true);
+    expect(card.active).toBe(true);
     expect(card).not.toHaveProperty("registrations");
     expect(buildAgentRegistration(input)).toBeUndefined();
     expect((card["x-msb"] as { no_llm_in_decision_path: boolean }).no_llm_in_decision_path).toBe(
