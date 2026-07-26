@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   CheckResultSchema,
   DealInputSchema,
+  EvmAddressSchema,
   ModuleResponseSchema,
+  RoyaltyBpsSchema,
   RulesFileSchema,
   RuleSchema,
   SettlementConstraintsSchema,
 } from "./index.js";
 
 const EVIDENCE_HASH = "a".repeat(64);
+const MAINTAINER_WALLET = "0x1111111111111111111111111111111111111111";
 
 const validDealInput = {
   deal_id: "job-123",
@@ -81,6 +84,20 @@ describe("DealInputSchema", () => {
 });
 
 describe("响应 schemas", () => {
+  it("校验 EVM 地址和版税基点边界", () => {
+    expect(EvmAddressSchema.safeParse(MAINTAINER_WALLET).success).toBe(true);
+    expect(EvmAddressSchema.safeParse(`0x${"1".repeat(39)}`).success).toBe(false);
+    expect(EvmAddressSchema.safeParse(`0x${"1".repeat(41)}`).success).toBe(false);
+    expect(EvmAddressSchema.safeParse(`0x${"g".repeat(40)}`).success).toBe(false);
+
+    for (const royaltyBps of [0, 500, 10_000]) {
+      expect(RoyaltyBpsSchema.safeParse(royaltyBps).success).toBe(true);
+    }
+    for (const royaltyBps of [-1, 10_001, 1.5]) {
+      expect(RoyaltyBpsSchema.safeParse(royaltyBps).success).toBe(false);
+    }
+  });
+
   it("接受 CheckResult 和 settlement_constraints 契约", () => {
     expect(CheckResultSchema.safeParse(validCheckResult).success).toBe(true);
     expect(SettlementConstraintsSchema.safeParse(validSettlementConstraints).success).toBe(true);
@@ -92,6 +109,8 @@ describe("响应 schemas", () => {
         module: "us-msb",
         version: "2026.07.1",
         updated_at: "2026-07-24T00:00:00Z",
+        maintainer_wallet: MAINTAINER_WALLET,
+        royalty_bps: 500,
         checks: [validCheckResult],
         overall: "HOLD",
         settlement_constraints: validSettlementConstraints,
@@ -99,6 +118,33 @@ describe("响应 schemas", () => {
         disclaimer: "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
       }).success,
     ).toBe(true);
+  });
+
+  it("拒绝缺失或非法版税字段，并接受合法响应", () => {
+    const validResponse = {
+      module: "us-msb",
+      version: "2026.07.1",
+      updated_at: "2026-07-24T00:00:00Z",
+      maintainer_wallet: MAINTAINER_WALLET,
+      royalty_bps: 500,
+      checks: [validCheckResult],
+      overall: "HOLD",
+      settlement_constraints: validSettlementConstraints,
+      evidence_hash: EVIDENCE_HASH,
+      disclaimer: "不构成法律意见。",
+    };
+    const missingRoyaltyFields: Record<string, unknown> = { ...validResponse };
+    delete missingRoyaltyFields.maintainer_wallet;
+    delete missingRoyaltyFields.royalty_bps;
+
+    expect(ModuleResponseSchema.safeParse(validResponse).success).toBe(true);
+    expect(ModuleResponseSchema.safeParse(missingRoyaltyFields).success).toBe(false);
+    expect(ModuleResponseSchema.safeParse({ ...validResponse, royalty_bps: 10_001 }).success).toBe(
+      false,
+    );
+    expect(
+      ModuleResponseSchema.safeParse({ ...validResponse, maintainer_wallet: "0x123" }).success,
+    ).toBe(false);
   });
 
   it("拒绝非 UTC 时间、非法版本和缺失 escalated_check_ids 的响应", () => {

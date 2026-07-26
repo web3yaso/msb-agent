@@ -7,6 +7,12 @@ import { ModuleResponseSchema } from "../schemas/index.js";
 import { createX402Price, type PaymentConfig, type X402MiddlewareFactory } from "./index.js";
 
 const PAY_TO = "0x1111111111111111111111111111111111111111";
+const royaltyConfig = {
+  "us-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
+  "uk-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
+  "eu-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
+  "sg-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
+} as const;
 const paymentConfig: PaymentConfig = {
   facilitatorUrl: "https://facilitator.example.test",
   mode: "x402-base-sepolia",
@@ -92,6 +98,7 @@ describe("x402 支付层", () => {
     const chargeCount = { value: 0 };
     const app = await createApp({
       paymentConfig,
+      royaltyConfig,
       x402MiddlewareFactory: createMockFacilitator(chargeCount),
     });
 
@@ -120,6 +127,7 @@ describe("x402 支付层", () => {
     const app = await createApp({
       evaluateRules: flakyEvaluate,
       paymentConfig,
+      royaltyConfig,
       x402MiddlewareFactory: createMockFacilitator(chargeCount),
     });
 
@@ -142,6 +150,7 @@ describe("x402 支付层", () => {
     };
     const app = await createApp({
       paymentConfig,
+      royaltyConfig,
       x402MiddlewareFactory: unavailableFactory,
     });
 

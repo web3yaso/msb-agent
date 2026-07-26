@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { loadPaymentConfig, parseUsdcPrice } from "./config.js";
+import { loadPaymentConfig, parseUsdcPrice, resolveModulePrices } from "./config.js";
 
 const PAY_TO = "0x1111111111111111111111111111111111111111";
 
@@ -61,8 +61,16 @@ describe("支付配置", () => {
       mode: "x402-base-sepolia",
       network: "base-sepolia",
     });
-    expect(config.modules["us-msb"]?.priceUsdc).toBe("1.000000");
+    expect(config.modules["us-msb"]?.priceAtomic).toBe("800000");
+    expect(config.modules["sg-msb"]?.priceAtomic).toBe("200000");
     expect(config.modules["uk-msb"]?.priceAtomic).toBe("2500000");
+  });
+
+  it("统一解析并规范化发现与支付使用的模块价格", () => {
+    expect(resolveModulePrices({ US_MSB_PRICE_USDC: "0.8" })["us-msb"]).toEqual({
+      priceAtomic: "800000",
+      priceUsdc: "0.800000",
+    });
   });
 
   it("付费模式缺少收款地址、facilitator 或地址非法时启动失败", () => {

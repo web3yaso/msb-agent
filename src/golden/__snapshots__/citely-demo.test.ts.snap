@@ -60,8 +60,10 @@ exports[`Citely Demo golden responses > eu-msb 的完整 ModuleResponse 匹配 g
   ],
   "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
   "evidence_hash": "33c65cb7cb4fb614d28ea99ecdc73e4254628c8a6cab1fe146231a1f7ccce271",
+  "maintainer_wallet": "0x5555555555555555555555555555555555555555",
   "module": "eu-msb",
   "overall": "ESCALATE",
+  "royalty_bps": 500,
   "settlement_constraints": {
     "blocked_check_ids": [
       "eu-psd2-payment-institution-authorisation",
@@ -119,8 +121,10 @@ exports[`Citely Demo golden responses > sg-msb 的完整 ModuleResponse 匹配 g
   ],
   "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
   "evidence_hash": "f337f7ad5e547092ecf29f87e2678653a972443bc8f16731bba7130ad046e2f8",
+  "maintainer_wallet": "0x5555555555555555555555555555555555555555",
   "module": "sg-msb",
   "overall": "HOLD",
+  "royalty_bps": 500,
   "settlement_constraints": {
     "blocked_check_ids": [
       "sg-psa-licence-class",
@@ -181,8 +185,10 @@ exports[`Citely Demo golden responses > uk-msb 的完整 ModuleResponse 匹配 g
   ],
   "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
   "evidence_hash": "1d71297d3a4085997f5dc93aad106cc356bf1541eea803bbf2ce6965210b5252",
+  "maintainer_wallet": "0x5555555555555555555555555555555555555555",
   "module": "uk-msb",
   "overall": "HOLD",
+  "royalty_bps": 500,
   "settlement_constraints": {
     "blocked_check_ids": [
       "uk-fca-payment-institution-authorisation",
@@ -244,8 +250,10 @@ exports[`Citely Demo golden responses > us-msb 的完整 ModuleResponse 匹配 g
   ],
   "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
   "evidence_hash": "fbf59533a95ef45bf3067772d45778f7c875aa0240a07b7a6376925b857cc12d",
+  "maintainer_wallet": "0x5555555555555555555555555555555555555555",
   "module": "us-msb",
   "overall": "HOLD",
+  "royalty_bps": 500,
   "settlement_constraints": {
     "blocked_check_ids": [
       "us-fincen-registration-money-transmission",

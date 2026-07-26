@@ -209,6 +209,8 @@ async function runSmoke(): Promise<void> {
     process.stdout.write("[5/5] 200: 支付与合规检查成功\n");
     process.stdout.write(`Payment settlement ID: ${payment.transaction}\n`);
     process.stdout.write(`evidence_hash: ${moduleResponse.evidence_hash}\n`);
+    process.stdout.write(`maintainer_wallet: ${moduleResponse.maintainer_wallet}\n`);
+    process.stdout.write(`royalty_bps: ${String(moduleResponse.royalty_bps)}\n`);
     process.stdout.write(`overall: ${moduleResponse.overall}\n`);
     process.stdout.write(`SMOKE OK ${payment.transaction}\n`);
   } finally {

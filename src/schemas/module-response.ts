@@ -2,9 +2,11 @@ import { z } from "zod";
 
 import {
   CheckStatusSchema,
+  EvmAddressSchema,
   EvidenceHashSchema,
   ModuleIdSchema,
   ModuleVersionSchema,
+  RoyaltyBpsSchema,
   UtcDateTimeSchema,
 } from "./common.js";
 
@@ -29,6 +31,8 @@ export const ModuleResponseSchema = z.strictObject({
   module: ModuleIdSchema,
   version: ModuleVersionSchema,
   updated_at: UtcDateTimeSchema,
+  maintainer_wallet: EvmAddressSchema,
+  royalty_bps: RoyaltyBpsSchema,
   checks: z.array(CheckResultSchema),
   overall: CheckStatusSchema,
   settlement_constraints: SettlementConstraintsSchema,

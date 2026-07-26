@@ -10,11 +10,11 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
 
 ## 端点一览
 
-| 方法 | 路径 | 收费 | 说明 |
-|---|---|---|---|
-| GET | `/modules` | 否 | 列出 4 个模块的定价、收款地址、法源、版本 |
-| GET | `/modules/:id/schema` | 否 | 该模块 evidence 字段的 JSON Schema |
-| POST | `/modules/:id/check` | 是（x402） | 提交交易信息，返回确定性检查结果 |
+| 方法 | 路径                  | 收费       | 说明                                      |
+| ---- | --------------------- | ---------- | ----------------------------------------- |
+| GET  | `/modules`            | 否         | 列出 4 个模块的定价、收款地址、法源、版本 |
+| GET  | `/modules/:id/schema` | 否         | 该模块 evidence 字段的 JSON Schema        |
+| POST | `/modules/:id/check`  | 是（x402） | 提交交易信息，返回确定性检查结果          |
 
 `:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`（`ModuleIdSchema`）。
 
@@ -34,12 +34,14 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
       "updated_at": "2026-07-24T00:00:00Z",
       "jurisdiction": "United States",
       "maintainer": "MSB Compliance Module Service",
-      "price_usdc": "1.000000",
+      "price_usdc": "0.800000",
       "pay_to": "0x0000000000000000000000000000000000000000",
       "sources": [
-        { "source": "31 CFR § 1022.380",
+        {
+          "source": "31 CFR § 1022.380",
           "source_url": "https://www.ecfr.gov/current/title-31/subtitle-B/chapter-X/part-1022",
-          "accessed_date": "2026-07-23" }
+          "accessed_date": "2026-07-23"
+        }
       ],
       "input_schema_url": "/modules/us-msb/schema"
     }
@@ -51,8 +53,9 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
 
 - `jurisdiction`：`United States` / `United Kingdom` / `European Union` / `Singapore`
   （固定字符串，见 `src/http/constants.ts` 的 `MODULE_JURISDICTIONS`）；
-- `price_usdc` / `pay_to`：直接读自环境变量（`{MODULE}_PRICE_USDC` /
-  `{MODULE}_PAY_TO`），是公开信息，**不是秘密**；`pay_to` 未配置时返回空字符串；
+- `price_usdc`：来自 `{MODULE}_PRICE_USDC` 或模块源码默认价，并统一规范化为六位小数；
+  `pay_to` 直接读自 `{MODULE}_PAY_TO`。两者是公开信息，**不是秘密**；`pay_to`
+  未配置时返回空字符串；
 - `sources`：该模块规则文件里全部 `{source, source_url, accessed_date}` 的去重集合
   （按 `source_url` 去重）；
 - `input_schema_url`：指向 `GET /modules/:id/schema`，采购方可据此预知需提交哪些
@@ -77,22 +80,22 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
 
 ### 请求体（`DealInputSchema`，`z.strictObject`，多余字段会被拒绝）
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `deal_id` | `string`（非空） | 是 | 由采购方生成的交易标识，回显进 `settlement_constraints.deal_id` |
-| `parties` | `Party[]`（至少 1 项） | 是 | 交易参与方 |
-| `activity` | `enum` | 是 | `money_transmission` \| `currency_exchange` \| `stored_value` \| `crypto_transfer` \| `check_cashing` |
-| `amount_usdc` | `number`（≥ 0） | 是 | 单笔交易金额，单位 USDC |
-| `monthly_volume_usdc` | `number`（≥ 0）\| `null` | 否 | 月交易量；交易量分级类检查项（如新加坡 SPI/MPI）依赖此字段，缺失时相关检查项输出 `HOLD` |
-| `evidence` | `Record<string, unknown>` | 是（可为 `{}`） | 证据键值对，键集合见该模块 `GET /modules/:id/schema` |
+| 字段                  | 类型                      | 必填            | 说明                                                                                                  |
+| --------------------- | ------------------------- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| `deal_id`             | `string`（非空）          | 是              | 由采购方生成的交易标识，回显进 `settlement_constraints.deal_id`                                       |
+| `parties`             | `Party[]`（至少 1 项）    | 是              | 交易参与方                                                                                            |
+| `activity`            | `enum`                    | 是              | `money_transmission` \| `currency_exchange` \| `stored_value` \| `crypto_transfer` \| `check_cashing` |
+| `amount_usdc`         | `number`（≥ 0）           | 是              | 单笔交易金额，单位 USDC                                                                               |
+| `monthly_volume_usdc` | `number`（≥ 0）\| `null`  | 否              | 月交易量；交易量分级类检查项（如新加坡 SPI/MPI）依赖此字段，缺失时相关检查项输出 `HOLD`               |
+| `evidence`            | `Record<string, unknown>` | 是（可为 `{}`） | 证据键值对，键集合见该模块 `GET /modules/:id/schema`                                                  |
 
 `Party`（`z.strictObject`）：
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `role` | `"payer"` \| `"payee"` | 是 | |
-| `country` | `string`，匹配 `^[A-Z]{2}$` | 是 | ISO 3166-1 alpha-2 |
-| `state` | `string`（非空） | 否 | 目前仅 `us-msb` 的纽约州规则用到 |
+| 字段      | 类型                        | 必填 | 说明                             |
+| --------- | --------------------------- | ---- | -------------------------------- |
+| `role`    | `"payer"` \| `"payee"`      | 是   |                                  |
+| `country` | `string`，匹配 `^[A-Z]{2}$` | 是   | ISO 3166-1 alpha-2               |
+| `state`   | `string`（非空）            | 否   | 目前仅 `us-msb` 的纽约州规则用到 |
 
 请求示例：
 
@@ -112,36 +115,38 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
 
 ### 响应体（`ModuleResponseSchema`）
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `module` | `ModuleId` | 回显请求的模块 |
-| `version` | `string`，`^\d{4}\.\d{2}\.\d+$` | 规则文件版本（如 `2026.07.1`） |
-| `updated_at` | ISO8601 UTC（无偏移量后缀，`YYYY-MM-DDTHH:mm:ssZ`） | 规则文件最后修订时间 |
-| `checks` | `CheckResult[]` | 见下 |
-| `overall` | `"PASS"` \| `"HOLD"` \| `"ESCALATE"` | 聚合结果，见「聚合语义」 |
-| `settlement_constraints` | `SettlementConstraints` | 见下 |
-| `evidence_hash` | 64 位十六进制字符串 | 与 `settlement_constraints.evidence_hash` 相同 |
-| `disclaimer` | `string` | 固定免责声明文案 |
+| 字段                     | 类型                                                | 说明                                                                                                                            |
+| ------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `module`                 | `ModuleId`                                          | 回显请求的模块                                                                                                                  |
+| `version`                | `string`，`^\d{4}\.\d{2}\.\d+$`                     | 规则文件版本（如 `2026.07.1`）                                                                                                  |
+| `updated_at`             | ISO8601 UTC（无偏移量后缀，`YYYY-MM-DDTHH:mm:ssZ`） | 规则文件最后修订时间                                                                                                            |
+| `maintainer_wallet`      | `string`，`^0x[0-9a-fA-F]{40}$`                     | Module 维护者版税收款地址；零地址表示实例未配置版税收款方，采购方必须视为“不支付版税”，不得向零地址转账                         |
+| `royalty_bps`            | `integer`，0–10000                                  | 版税基点（10000 = 100%），基数为本次调用采购价；该运营参数不被 `evidence_hash` 背书，采购方须按自身白名单与单笔上限校验后再支付 |
+| `checks`                 | `CheckResult[]`                                     | 见下                                                                                                                            |
+| `overall`                | `"PASS"` \| `"HOLD"` \| `"ESCALATE"`                | 聚合结果，见「聚合语义」                                                                                                        |
+| `settlement_constraints` | `SettlementConstraints`                             | 见下                                                                                                                            |
+| `evidence_hash`          | 64 位十六进制字符串                                 | 与 `settlement_constraints.evidence_hash` 相同                                                                                  |
+| `disclaimer`             | `string`                                            | 固定免责声明文案                                                                                                                |
 
 `CheckResult`：
 
-| 字段 | 说明 |
-|---|---|
-| `id` | 规则 id，如 `us-fincen-registration-money-transmission` |
-| `result` | `PASS` \| `HOLD` \| `ESCALATE` |
+| 字段     | 说明                                                             |
+| -------- | ---------------------------------------------------------------- |
+| `id`     | 规则 id，如 `us-fincen-registration-money-transmission`          |
+| `result` | `PASS` \| `HOLD` \| `ESCALATE`                                   |
 | `reason` | 人类可读原因（不参与 `evidence_hash` 计算，措辞修正不改变 hash） |
-| `source` | 法源引用（对应规则文件 `source` 字段） |
+| `source` | 法源引用（对应规则文件 `source` 字段）                           |
 
 `SettlementConstraints`：
 
-| 字段 | 说明 |
-|---|---|
-| `module` / `module_version` | 冗余自根字段，便于独立传入结算层且自证来源 |
-| `deal_id` | 回显请求 `deal_id` |
-| `valid_until` | 请求时间（UTC）+ 72 小时，ISO8601。**`PASS` 时**表示"72h 内本结果可被结算层引用"；**`HOLD`/`ESCALATE` 时**表示"72h 内本阻断状态可被引用"——过期不等于放行，只表示需重查 |
-| `blocked_check_ids` | 仅含 `result = HOLD` 的 check id（"缺证据暂停付款"路由） |
-| `escalated_check_ids` | 仅含 `result = ESCALATE` 的 check id（"灰区转人工"路由，与上者分开路由） |
-| `evidence_hash` | 同响应根字段 |
+| 字段                        | 说明                                                                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `module` / `module_version` | 冗余自根字段，便于独立传入结算层且自证来源                                                                                                                             |
+| `deal_id`                   | 回显请求 `deal_id`                                                                                                                                                     |
+| `valid_until`               | 请求时间（UTC）+ 72 小时，ISO8601。**`PASS` 时**表示"72h 内本结果可被结算层引用"；**`HOLD`/`ESCALATE` 时**表示"72h 内本阻断状态可被引用"——过期不等于放行，只表示需重查 |
+| `blocked_check_ids`         | 仅含 `result = HOLD` 的 check id（"缺证据暂停付款"路由）                                                                                                               |
+| `escalated_check_ids`       | 仅含 `result = ESCALATE` 的 check id（"灰区转人工"路由，与上者分开路由）                                                                                               |
+| `evidence_hash`             | 同响应根字段                                                                                                                                                           |
 
 ### 聚合语义
 
@@ -158,7 +163,7 @@ evidence_hash = sha256( rules_file_bytes || 0x1F || canon(input) || 0x1F || cano
 - `rules_file_bytes`：该模块规则文件的原始 UTF-8 字节（不做 JSON 规范化——文件本身
   是版本化产物，字节即身份）；
 - `canon(input)`：`{deal_id, parties, activity, amount_usdc, monthly_volume_usdc?,
-  evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符串 NFC）；
+evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符串 NFC）；
   `parties` 先按 `(role, country, state)` 排序，数组书写顺序不影响 hash；
   `monthly_volume_usdc` 为 `undefined` 时整个字段省略（不是写入 `null`）；
 - `canon(checks)`：仅 `{id, result}` 数组，按 `id` 排序后规范化——**不含
@@ -190,19 +195,45 @@ evidence_hash = sha256( rules_file_bytes || 0x1F || canon(input) || 0x1F || cano
   "module": "us-msb",
   "version": "2026.07.1",
   "updated_at": "2026-07-24T00:00:00Z",
+  "maintainer_wallet": "0x1111111111111111111111111111111111111111",
+  "royalty_bps": 500,
   "checks": [
-    { "id": "us-fincen-registration-money-transmission", "result": "HOLD",
-      "reason": "缺少所需证据：fincen_msb_registration", "source": "31 CFR § 1022.380" },
-    { "id": "us-fincen-registration-threshold-activities", "result": "PASS",
-      "reason": "规则条件未触发", "source": "31 CFR § 1010.100(ff)" },
-    { "id": "us-bsa-aml-program", "result": "HOLD",
-      "reason": "缺少所需证据：bsa_aml_program", "source": "31 CFR § 1022.210" },
-    { "id": "us-sar-controls", "result": "HOLD",
-      "reason": "缺少所需证据：sar_monitoring_and_filing_controls", "source": "31 CFR § 1022.320" },
-    { "id": "us-ny-money-transmitter-license", "result": "HOLD",
-      "reason": "缺少所需证据：ny_money_transmitter_license", "source": "NY Banking Law Article 13-B" },
-    { "id": "us-ny-bitlicense", "result": "PASS",
-      "reason": "规则条件未触发", "source": "23 NYCRR Part 200" }
+    {
+      "id": "us-fincen-registration-money-transmission",
+      "result": "HOLD",
+      "reason": "缺少所需证据：fincen_msb_registration",
+      "source": "31 CFR § 1022.380"
+    },
+    {
+      "id": "us-fincen-registration-threshold-activities",
+      "result": "PASS",
+      "reason": "规则条件未触发",
+      "source": "31 CFR § 1010.100(ff)"
+    },
+    {
+      "id": "us-bsa-aml-program",
+      "result": "HOLD",
+      "reason": "缺少所需证据：bsa_aml_program",
+      "source": "31 CFR § 1022.210"
+    },
+    {
+      "id": "us-sar-controls",
+      "result": "HOLD",
+      "reason": "缺少所需证据：sar_monitoring_and_filing_controls",
+      "source": "31 CFR § 1022.320"
+    },
+    {
+      "id": "us-ny-money-transmitter-license",
+      "result": "HOLD",
+      "reason": "缺少所需证据：ny_money_transmitter_license",
+      "source": "NY Banking Law Article 13-B"
+    },
+    {
+      "id": "us-ny-bitlicense",
+      "result": "PASS",
+      "reason": "规则条件未触发",
+      "source": "23 NYCRR Part 200"
+    }
   ],
   "overall": "HOLD",
   "settlement_constraints": {
@@ -261,16 +292,16 @@ evidence_hash = sha256( rules_file_bytes || 0x1F || canon(input) || 0x1F || cano
 
 ## 支付与错误码
 
-| 状态码 | 触发条件 | 响应体要点 |
-|---|---|---|
-| `200` | 校验通过、法域受理、（付费模式下）支付成功 | 见上文 `ModuleResponseSchema` |
-| `400` | 请求体不是合法 JSON，或不满足 `DealInputSchema`（**不收费**，在 x402 中间件之前完成校验） | `{ "error": "invalid_request", "issues": [{ "path": [...], "message": "..." }], "disclaimer": "..." }` |
-| `402` | 仅 `PAYMENT_MODE = x402-base-sepolia` / `x402-arc-testnet` 时，请求未携带有效支付凭证 | x402 标准 `PAYMENT-REQUIRED` 响应头 + 402 payload（由 `@x402/hono` 生成，非本服务自定义 JSON） |
-| `404` | `:id` 不是 `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` | `{ "error": "module_not_found", ... }` |
-| `413` | 请求体超过 256KB | `{ "error": "request_too_large", "message": "请求体不得超过 256KB", "disclaimer": "..." }` |
-| `422` | Schema 校验通过，但**全部** party 均不在模块法域内（法域受理边界：**任一** party 在法域内即受理，422 只在全部 party 都不在时触发，避免用 422 绕过 ESCALATE 不变量） | `{ "error": "jurisdiction_not_applicable", "message": "全部交易方均不在 <法域> 模块适用法域内", "disclaimer": "..." }` |
-| `500` | 支付结算成功后引擎求值/序列化抛异常 | `{ "error": "internal_error", "message": "检查执行失败，可使用同一支付凭证重试", "payment_credential_id": "<sha256(凭证)>"（若已收到支付凭证）, "disclaimer": "..." }` |
-| `502` | facilitator 不可达（支付验证/结算请求失败，且尚未确认扣款） | `{ "error": "facilitator_unavailable", "message": "支付服务暂不可用，请稍后重试", "disclaimer": "..." }`；不产生半计费状态 |
+| 状态码 | 触发条件                                                                                                                                                            | 响应体要点                                                                                                                                                             |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200`  | 校验通过、法域受理、（付费模式下）支付成功                                                                                                                          | 见上文 `ModuleResponseSchema`                                                                                                                                          |
+| `400`  | 请求体不是合法 JSON，或不满足 `DealInputSchema`（**不收费**，在 x402 中间件之前完成校验）                                                                           | `{ "error": "invalid_request", "issues": [{ "path": [...], "message": "..." }], "disclaimer": "..." }`                                                                 |
+| `402`  | 仅 `PAYMENT_MODE = x402-base-sepolia` / `x402-arc-testnet` 时，请求未携带有效支付凭证                                                                               | x402 标准 `PAYMENT-REQUIRED` 响应头 + 402 payload（由 `@x402/hono` 生成，非本服务自定义 JSON）                                                                         |
+| `404`  | `:id` 不是 `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`                                                                                                             | `{ "error": "module_not_found", ... }`                                                                                                                                 |
+| `413`  | 请求体超过 256KB                                                                                                                                                    | `{ "error": "request_too_large", "message": "请求体不得超过 256KB", "disclaimer": "..." }`                                                                             |
+| `422`  | Schema 校验通过，但**全部** party 均不在模块法域内（法域受理边界：**任一** party 在法域内即受理，422 只在全部 party 都不在时触发，避免用 422 绕过 ESCALATE 不变量） | `{ "error": "jurisdiction_not_applicable", "message": "全部交易方均不在 <法域> 模块适用法域内", "disclaimer": "..." }`                                                 |
+| `500`  | 支付结算成功后引擎求值/序列化抛异常                                                                                                                                 | `{ "error": "internal_error", "message": "检查执行失败，可使用同一支付凭证重试", "payment_credential_id": "<sha256(凭证)>"（若已收到支付凭证）, "disclaimer": "..." }` |
+| `502`  | facilitator 不可达（支付验证/结算请求失败，且尚未确认扣款）                                                                                                         | `{ "error": "facilitator_unavailable", "message": "支付服务暂不可用，请稍后重试", "disclaimer": "..." }`；不产生半计费状态                                             |
 
 **付费后幂等**：x402 支付被接受后，若引擎求值或响应序列化抛异常（→ 500），服务记录
 支付凭证哈希（`sha256(凭证)`，不落原始凭证）与请求体哈希的组合键；同一支付凭证对

@@ -5,6 +5,26 @@
 
 > 本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**。
 
+## [0.2.0] - 2026-07-25
+
+对应设计：`docs/design/2026-07-25-hackathon-v2.2-alignment.md`。
+
+### 新增
+
+- `POST /modules/:id/check` 的 200 响应新增 `maintainer_wallet` 与 `royalty_bps`。
+- 新增全局及按模块覆盖的维护者钱包、版税基点环境配置。
+
+### 变更
+
+- 四模块默认价格调整为 `us-msb` 0.800000、`eu-msb` 0.600000、`uk-msb`
+  0.400000、`sg-msb` 0.200000 测试网 USDC。
+- `GET /modules` 的 `price_usdc` 与支付层使用同一价格解析，并规范化为六位小数。
+
+### 未变更（不变量）
+
+- `src/rules/*.json` 零改动，不 bump 任何模块 version。
+- `evidence_hash` 定义与四模块全部既有值保持不变。
+
 ## [0.1.0] - 2026-07-24
 
 首个可运行版本：确定性 MSB 合规检查 API + x402 按次收费，覆盖 4 个法域模块。
@@ -18,7 +38,7 @@
   `CheckResult`、`ModuleResponse`、`SettlementConstraints`、规则文件 schema。
 - 规范化与 `evidence_hash` 纯函数模块（`src/evidence-hash/`）：RFC 8785 (JCS)
   风格规范化 + `0x1F` 分隔的 `sha256(rules_file_bytes || canon(input) ||
-  canon(checks))`，`parties` 排序保证数组顺序不影响 hash，`checks` 仅取
+canon(checks))`，`parties` 排序保证数组顺序不影响 hash，`checks` 仅取
   `{id, result}` 保证措辞修正不改变 hash。
 - 确定性规则引擎（`src/engine/`）：`when` 条件匹配（`activity` /
   `party_country` / `party_state` / `amount_gte` / `monthly_volume_gte`）+

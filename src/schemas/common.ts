@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
+
+export const EvmAddressSchema = z.string().regex(EVM_ADDRESS_PATTERN);
+
+export const RoyaltyBpsSchema = z.number().int().min(0).max(10_000);
+
 export const ActivitySchema = z.enum([
   "money_transmission",
   "currency_exchange",

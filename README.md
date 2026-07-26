@@ -5,7 +5,7 @@ API。服务是一个确定性规则引擎：4 个法域模块（美国 / 英国
 文件对交易输入做机械求值，输出 `PASS` / `HOLD` / `ESCALATE` 三态检查项状态，通过
 [x402](https://www.x402.org/) 协议在 Circle Arc Testnet 上以测试网 USDC 收费结算。
 
-本项目是 Circle / Arc 黑客松方案（Citely Deal Desk v2.0）中的 4 个 Compliance
+本项目是 Circle / Arc 黑客松方案（Citely Deal Desk v2.2）中的 4 个 Compliance
 Module（方案流程图 F1–F3）参考实现。
 
 > **免责声明**：本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**，
@@ -15,6 +15,7 @@ Module（方案流程图 F1–F3）参考实现。
 ## 目录
 
 - [项目定位](#项目定位)
+- [黑客松架构位置（Citely Deal Desk v2.2）](#黑客松架构位置citely-deal-desk-v22)
 - [快速开始](#快速开始)
 - [架构要点](#架构要点)
 - [API 概览](#api-概览)
@@ -25,15 +26,32 @@ Module（方案流程图 F1–F3）参考实现。
 
 ## 项目定位
 
-| 模块 | 法域 | 受理条件 |
-|---|---|---|
-| `us-msb` | 美国（联邦 + 纽约州） | 任一 party `country = "US"` |
-| `uk-msb` | 英国 | 任一 party `country = "GB"` |
+| 模块     | 法域                               | 受理条件                        |
+| -------- | ---------------------------------- | ------------------------------- |
+| `us-msb` | 美国（联邦 + 纽约州）              | 任一 party `country = "US"`     |
+| `uk-msb` | 英国                               | 任一 party `country = "GB"`     |
 | `eu-msb` | 欧盟（含德/法/荷成员国专项检查项） | 任一 party 落在 27 个欧盟成员国 |
-| `sg-msb` | 新加坡 | 任一 party `country = "SG"` |
+| `sg-msb` | 新加坡                             | 任一 party `country = "SG"`     |
 
 **不做**：规则自动更新、多语言输出、KYB/钱包数据采购（属 Citely F4，另一供应商）、
 Jurisdiction Review（属 Citely F5）、真实法律意见。
+
+## 黑客松架构位置（Citely Deal Desk v2.2）
+
+四层架构从上到下为：L4 客户执行层 → L3 Arc Testnet 协议与支付层 → L2 判定服务层
+（案件引擎，主仓库）→ **L1 知识与供给层（本仓库 = module-server）**。L2 通过
+HTTP + x402 付费调用本仓库；本仓库对 L2 是已部署的第三方 Module 供应商，保持独立
+部署，不并入主仓库 monorepo。
+
+| 仓库               | 职责                                                                | 关系                                 |
+| ------------------ | ------------------------------------------------------------------- | ------------------------------------ |
+| `citely-deal-desk` | L2/L3/L4 + rubrics，主仓库（**TODO：GitHub 链接待主仓库公开后补**） | 主仓库 README 将回链本仓库，形成互链 |
+| `msb-agent`        | L1 module-server，本仓库，独立部署                                  | 为主仓库提供付费 Module API          |
+
+L2 调用 `POST /modules/:id/check`，付费成功后从 200 响应取得 `evidence_hash`（写入
+SA 的 `modules_used`），以及 `maintainer_wallet` / `royalty_bps`（用于版税微支付与
+账本 `category=royalty`）。本仓库只输出检查项状态；PASS/HOLD/ESCALATE 的结算编排
+与 SA 生成均在 L2。本仓库不含 LLM，也不产出法律意见。
 
 ## 快速开始
 
@@ -85,6 +103,7 @@ curl http://localhost:3000/modules/us-msb/schema
   改变 hash）。规则文件字节本身不做 JSON 规范化——文件是版本化产物，字节即身份。
   算法实现见 `src/evidence-hash/evidence-hash.ts`，字段级语义见
   [docs/api.md](docs/api.md#evidence_hash-与-settlement_constraints)。
+
 - **门槛类规则是单笔安全下界**：法源门槛多为聚合口径（如美国货币兑换
   $1,000/人/日累计、新加坡 SPI/MPI 月均交易量分级）；引擎只看单笔/月交易量输入，
   语义是"单笔 ≥ 门槛 ⇒ 聚合必然 ≥ 门槛"的保守触发方向，单笔未达门槛时**不输出
@@ -129,11 +148,18 @@ curl -X POST http://localhost:3000/modules/us-msb/check \
   "module": "us-msb",
   "version": "2026.07.1",
   "checks": [
-    { "id": "us-fincen-registration-money-transmission", "result": "HOLD",
-      "reason": "缺少所需证据：fincen_msb_registration", "source": "31 CFR § 1022.380" }
+    {
+      "id": "us-fincen-registration-money-transmission",
+      "result": "HOLD",
+      "reason": "缺少所需证据：fincen_msb_registration",
+      "source": "31 CFR § 1022.380"
+    }
   ],
   "overall": "HOLD",
-  "settlement_constraints": { "blocked_check_ids": ["us-fincen-registration-money-transmission", "..."], "...": "..." },
+  "settlement_constraints": {
+    "blocked_check_ids": ["us-fincen-registration-money-transmission", "..."],
+    "...": "..."
+  },
   "evidence_hash": "fbf59533a95ef45bf3067772d45778f7c875aa0240a07b7a6376925b857cc12d",
   "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。"
 }
@@ -144,15 +170,23 @@ curl -X POST http://localhost:3000/modules/us-msb/check \
 三档 `PAYMENT_MODE`，**源码默认值为 `x402-arc-testnet`**（默认不允许是 `off`，这是
 一条架构红线）：
 
-| 模式 | 用途 | 网络 |
-|---|---|---|
-| `off` | 本地开发 / 单元测试；必须显式设置才生效 | 不发起支付 |
-| `x402-base-sepolia` | 兜底：Arc facilitator 不稳定时的降级演示 | Base Sepolia，`eip155:84532` |
-| `x402-arc-testnet` | **主目标**：Circle hosted testnet facilitator | Arc Testnet，`eip155:5042002` |
+| 模式                | 用途                                          | 网络                          |
+| ------------------- | --------------------------------------------- | ----------------------------- |
+| `off`               | 本地开发 / 单元测试；必须显式设置才生效       | 不发起支付                    |
+| `x402-base-sepolia` | 兜底：Arc facilitator 不稳定时的降级演示      | Base Sepolia，`eip155:84532`  |
+| `x402-arc-testnet`  | **主目标**：Circle hosted testnet facilitator | Arc Testnet，`eip155:5042002` |
 
-定价：每模块每次调用统一 **1.000000 测试网 USDC**，可用 `US_MSB_PRICE_USDC` /
-`UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` 按模块覆盖（合法范围
-`0 < price <= 100`，启动时校验，非法值直接拒绝启动，防止小数点错位导致的计费事故）。
+四模块差异化默认定价如下，可用对应 `{MODULE}_PRICE_USDC` 环境变量覆盖：
+
+| 模块     | 每次调用价格（测试网 USDC） |
+| -------- | --------------------------: |
+| `us-msb` |                  `0.800000` |
+| `eu-msb` |                  `0.600000` |
+| `uk-msb` |                  `0.400000` |
+| `sg-msb` |                  `0.200000` |
+
+价格合法范围为 `0 < price <= 100`，启动时校验并规范化为六位小数；非法值直接拒绝
+启动，防止小数点错位导致计费事故。
 收款地址通过 `US_MSB_PAY_TO` 等四个环境变量配置——收款地址是公开信息会出现在
 `GET /modules` 响应里，但绝不写入代码或文档，只走环境变量。
 
@@ -174,9 +208,13 @@ Arc Testnet 走 Circle Gateway 的 `GatewayWalletBatched` 支付方案（`@x402/
 
 ```bash
 PAYMENT_MODE=x402-arc-testnet \
+MODULE_MAINTAINER_WALLET=<维护者钱包地址> \
 X402_SMOKE_CLIENT_PRIVATE_KEY=<测试钱包私钥，占位符，不要提交到仓库> \
 npm run smoke:arc
 ```
+
+`x402-arc-testnet` 模式要求 `MODULE_MAINTAINER_WALLET` 已设置，否则服务会在启动时
+fail-fast；`npm run smoke:arc` 同样受此校验约束。
 
 冒烟脚本相关环境变量（`X402_SMOKE_CLIENT_PRIVATE_KEY` / `SMOKE_ARC_RPC_URL` /
 `SMOKE_MODULE` / `SMOKE_PORT` / `SMOKE_DEPOSIT_USDC`）说明见脚本本身
@@ -215,16 +253,18 @@ npm test
 完整模板见 `.env.example`（复制为 `.env` 后按需修改；真实收款地址/私钥永远不要
 提交到仓库）。核心配置项：
 
-| 变量 | 说明 | 默认值 |
-|---|---|---|
-| `PAYMENT_MODE` | `off` \| `x402-base-sepolia` \| `x402-arc-testnet` | 源码默认 `x402-arc-testnet`（`.env.example` 示例显式写 `off`） |
-| `PORT` | HTTP 监听端口 | `3000` |
-| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数 | `1.000000` |
-| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO` | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填 | 占位地址，启用前必须替换 |
-| `X402_ARC_TESTNET_FACILITATOR_URL` | Circle Arc Testnet hosted facilitator URL；仅 `x402-arc-testnet` 用 | 无（该模式下必填） |
-| `X402_BASE_SEPOLIA_FACILITATOR_URL` | Base Sepolia facilitator URL；仅 `x402-base-sepolia` 用 | 无（该模式下必填） |
-| `CHECK_RULE_LINKS` | 设为 `1` 启用规则法源链接存活检查（网络请求） | `0`（跳过） |
-| `RULES_BASE_REF` | 规则版本 CI 校验的 git 对比基准 | `HEAD^` |
+| 变量                                                                                  | 说明                                                                                        | 默认值                                                         |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                          | 源码默认 `x402-arc-testnet`（`.env.example` 示例显式写 `off`） |
+| `PORT`                                                                                | HTTP 监听端口                                                                               | `3000`                                                         |
+| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数                                                           | 分别为 `0.800000` / `0.400000` / `0.600000` / `0.200000`       |
+| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填                     | 占位地址，启用前必须替换                                       |
+| `MODULE_MAINTAINER_WALLET`                                                            | 全局维护者版税收款地址；x402 模式必填，可用四个 `{MODULE}_MAINTAINER_WALLET` 变量按模块覆盖 | `off` 模式回落零地址                                           |
+| `MODULE_ROYALTY_BPS`                                                                  | 全局版税基点（0–10000 整数），可用四个 `{MODULE}_ROYALTY_BPS` 变量按模块覆盖                | `0`                                                            |
+| `X402_ARC_TESTNET_FACILITATOR_URL`                                                    | Circle Arc Testnet hosted facilitator URL；仅 `x402-arc-testnet` 用                         | 无（该模式下必填）                                             |
+| `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL；仅 `x402-base-sepolia` 用                                     | 无（该模式下必填）                                             |
+| `CHECK_RULE_LINKS`                                                                    | 设为 `1` 启用规则法源链接存活检查（网络请求）                                               | `0`（跳过）                                                    |
+| `RULES_BASE_REF`                                                                      | 规则版本 CI 校验的 git 对比基准                                                             | `HEAD^`                                                        |
 
 `npm run smoke:arc` 额外使用的变量（真实链上冒烟专用，不影响 `npm run dev` /
 `npm test`）：`X402_SMOKE_CLIENT_PRIVATE_KEY`（必填，测试钱包私钥）、

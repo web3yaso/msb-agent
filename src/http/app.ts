@@ -5,7 +5,10 @@ import { evaluate } from "../engine/index.js";
 import {
   createPaymentMiddlewares,
   loadPaymentConfig,
+  loadRoyaltyConfig,
   PaidRetryStore,
+  resolveModulePrices,
+  type ModuleRoyaltyConfig,
   type PaymentConfig,
   type PaymentRequestState,
   type X402MiddlewareFactory,
@@ -21,7 +24,6 @@ import {
   EU_MEMBER_COUNTRIES,
   MODULE_JURISDICTIONS,
   MODULE_PAY_TO_ENV,
-  MODULE_PRICE_ENV,
 } from "./constants.js";
 import { loadModules, type LoadedModule } from "./module-loader.js";
 
@@ -32,6 +34,7 @@ export interface CreateAppOptions {
   evaluateRules?: typeof evaluate;
   now?: () => Date;
   paymentConfig?: PaymentConfig;
+  royaltyConfig?: Record<ModuleId, ModuleRoyaltyConfig>;
   x402MiddlewareFactory?: X402MiddlewareFactory;
 }
 
@@ -55,14 +58,18 @@ function getSources(module: LoadedModule) {
   return [...sourcesByUrl.values()];
 }
 
-function getDiscoveryModule(moduleId: ModuleId, module: LoadedModule) {
+function getDiscoveryModule(
+  moduleId: ModuleId,
+  module: LoadedModule,
+  modulePrices: ReturnType<typeof resolveModulePrices>,
+) {
   return {
     module: moduleId,
     version: module.metadata.version,
     updated_at: module.metadata.updated_at,
     jurisdiction: MODULE_JURISDICTIONS[moduleId],
     maintainer: MODULE_MAINTAINER,
-    price_usdc: process.env[MODULE_PRICE_ENV[moduleId]] ?? "1.000000",
+    price_usdc: modulePrices[moduleId].priceUsdc,
     pay_to: process.env[MODULE_PAY_TO_ENV[moduleId]] ?? "",
     sources: getSources(module),
     input_schema_url: `/modules/${moduleId}/schema`,
@@ -87,6 +94,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
   const now = options.now ?? (() => new Date());
   const evaluateRules = options.evaluateRules ?? evaluate;
   const paymentConfig = options.paymentConfig ?? loadPaymentConfig();
+  const royaltyConfig = options.royaltyConfig ?? loadRoyaltyConfig(process.env, paymentConfig.mode);
+  const modulePrices = resolveModulePrices(process.env);
   const retryStore = new PaidRetryStore(now);
   const paymentRequestStates = new WeakMap<Request, PaymentRequestState>();
   const paymentMiddlewares = await createPaymentMiddlewares(
@@ -116,7 +125,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
     context.json({
       disclaimer: DISCLAIMER,
       modules: ModuleIdSchema.options.map((moduleId) =>
-        getDiscoveryModule(moduleId, modules[moduleId]),
+        getDiscoveryModule(moduleId, modules[moduleId], modulePrices),
       ),
     }),
   );
@@ -257,6 +266,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
       module: selectedModule.id,
       version: selectedModule.module.metadata.version,
       updated_at: selectedModule.module.metadata.updated_at,
+      maintainer_wallet: royaltyConfig[selectedModule.id].maintainerWallet,
+      royalty_bps: royaltyConfig[selectedModule.id].royaltyBps,
       checks: engineResult.checks,
       overall: engineResult.overall,
       settlement_constraints: {

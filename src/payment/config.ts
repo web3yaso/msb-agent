@@ -1,5 +1,9 @@
-import type { ModuleId } from "../schemas/index.js";
-import { MODULE_PAY_TO_ENV, MODULE_PRICE_ENV } from "../http/constants.js";
+import {
+  MODULE_DEFAULT_PRICE_USDC,
+  MODULE_PAY_TO_ENV,
+  MODULE_PRICE_ENV,
+} from "../http/constants.js";
+import { EVM_ADDRESS_PATTERN, ModuleIdSchema, type ModuleId } from "../schemas/index.js";
 
 export const PAYMENT_MODES = ["off", "x402-base-sepolia", "x402-arc-testnet"] as const;
 
@@ -19,9 +23,7 @@ export interface PaymentConfig {
 }
 
 const DEFAULT_PAYMENT_MODE: PaymentMode = "x402-arc-testnet";
-const DEFAULT_PRICE_USDC = "1.000000";
 const MAX_PRICE_ATOMIC = 100_000_000n;
-const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
 function requireEnvironmentValue(environment: NodeJS.ProcessEnv, variableName: string): string {
   const value = environment[variableName]?.trim();
@@ -56,6 +58,20 @@ export function parseUsdcPrice(rawPrice: string): {
   };
 }
 
+/** 解析四模块价格；未配置时回落模块默认价，非法值抛错。 */
+export function resolveModulePrices(
+  environment: NodeJS.ProcessEnv = process.env,
+): Record<ModuleId, { priceAtomic: string; priceUsdc: string }> {
+  return Object.fromEntries(
+    ModuleIdSchema.options.map((moduleId) => [
+      moduleId,
+      parseUsdcPrice(
+        environment[MODULE_PRICE_ENV[moduleId]] ?? MODULE_DEFAULT_PRICE_USDC[moduleId],
+      ),
+    ]),
+  ) as Record<ModuleId, { priceAtomic: string; priceUsdc: string }>;
+}
+
 function parseFacilitatorUrl(rawUrl: string): string {
   const facilitatorUrl = new URL(rawUrl);
   if (facilitatorUrl.protocol !== "https:" && facilitatorUrl.protocol !== "http:") {
@@ -77,6 +93,7 @@ export function loadPaymentConfig(environment: NodeJS.ProcessEnv = process.env):
     return { mode, modules: {} };
   }
 
+  const modulePrices = resolveModulePrices(environment);
   const isArc = mode === "x402-arc-testnet";
   const facilitatorVariable = isArc
     ? "X402_ARC_TESTNET_FACILITATOR_URL"
@@ -88,8 +105,7 @@ export function loadPaymentConfig(environment: NodeJS.ProcessEnv = process.env):
       if (!EVM_ADDRESS_PATTERN.test(payTo)) {
         throw new Error(`非法收款地址：${MODULE_PAY_TO_ENV[moduleId]}`);
       }
-      const price = parseUsdcPrice(environment[MODULE_PRICE_ENV[moduleId]] ?? DEFAULT_PRICE_USDC);
-      return [moduleId, { payTo: payTo as `0x${string}`, ...price }];
+      return [moduleId, { payTo: payTo as `0x${string}`, ...modulePrices[moduleId] }];
     }),
   ) as Record<ModuleId, ModulePaymentConfig>;
 

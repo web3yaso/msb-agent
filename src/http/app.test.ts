@@ -14,6 +14,7 @@ interface DiscoveryResponse {
   modules: {
     module: string;
     pay_to: string;
+    price_usdc: string;
     input_schema_url: string;
   }[];
 }
@@ -34,6 +35,7 @@ const completeUsInput = {
     ny_money_transmitter_license: "NY-MT-123",
   },
 };
+const MAINTAINER_WALLET = "0x3333333333333333333333333333333333333333";
 
 describe("HTTP app", () => {
   let app: Awaited<ReturnType<typeof createApp>>;
@@ -41,6 +43,8 @@ describe("HTTP app", () => {
   beforeAll(async () => {
     vi.stubEnv("PAYMENT_MODE", "off");
     vi.stubEnv("US_MSB_PAY_TO", "0x1111111111111111111111111111111111111111");
+    vi.stubEnv("MODULE_MAINTAINER_WALLET", MAINTAINER_WALLET);
+    vi.stubEnv("MODULE_ROYALTY_BPS", "500");
     app = await createApp({ now: () => new Date("2026-07-24T00:00:00Z") });
   });
 
@@ -59,6 +63,7 @@ describe("HTTP app", () => {
       expect.objectContaining({
         module: "us-msb",
         pay_to: "0x1111111111111111111111111111111111111111",
+        price_usdc: "0.800000",
         input_schema_url: "/modules/us-msb/schema",
       }),
     );
@@ -79,6 +84,54 @@ describe("HTTP app", () => {
     expect(body.properties.evidence.properties).toHaveProperty("ny_bitlicense");
   });
 
+  it("GET /modules 将价格环境变量规范化为六位小数", async () => {
+    vi.stubEnv("US_MSB_PRICE_USDC", "0.8");
+    const normalizedApp = await createApp({
+      now: () => new Date("2026-07-24T00:00:00Z"),
+    });
+    const response = await normalizedApp.request("/modules");
+    const body = (await response.json()) as DiscoveryResponse;
+
+    expect(body.modules.find(({ module }) => module === "us-msb")?.price_usdc).toBe("0.800000");
+    vi.stubEnv("US_MSB_PRICE_USDC", undefined);
+  });
+
+  it("版税配置变化不影响 evidence_hash 或 settlement constraints", async () => {
+    const firstApp = await createApp({
+      now: () => new Date("2026-07-24T00:00:00Z"),
+      royaltyConfig: {
+        "us-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
+        "uk-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
+        "eu-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
+        "sg-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
+      },
+    });
+    const otherWallet = "0x4444444444444444444444444444444444444444";
+    const secondApp = await createApp({
+      now: () => new Date("2026-07-24T00:00:00Z"),
+      royaltyConfig: {
+        "us-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
+        "uk-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
+        "eu-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
+        "sg-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
+      },
+    });
+    const request = () => ({
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(completeUsInput),
+    });
+    const firstBody = ModuleResponseSchema.parse(
+      await (await firstApp.request("/modules/us-msb/check", request())).json(),
+    );
+    const secondBody = ModuleResponseSchema.parse(
+      await (await secondApp.request("/modules/us-msb/check", request())).json(),
+    );
+
+    expect(firstBody.evidence_hash).toBe(secondBody.evidence_hash);
+    expect(firstBody.settlement_constraints).toEqual(secondBody.settlement_constraints);
+  });
+
   it("POST /modules/:id/check 返回完整 ModuleResponse 和 settlement constraints", async () => {
     const response = await app.request("/modules/us-msb/check", {
       method: "POST",
@@ -89,6 +142,8 @@ describe("HTTP app", () => {
 
     expect(response.status).toBe(200);
     expect(body.disclaimer).toBe(DISCLAIMER);
+    expect(body.maintainer_wallet).toBe(MAINTAINER_WALLET);
+    expect(body.royalty_bps).toBe(500);
     expect(body.overall).toBe("PASS");
     expect(body.settlement_constraints).toMatchObject({
       module: "us-msb",
@@ -114,7 +169,10 @@ describe("HTTP app", () => {
     });
 
     expect(malformedResponse.status).toBe(400);
-    expect(((await malformedResponse.json()) as ErrorResponse).disclaimer).toBe(DISCLAIMER);
+    const malformedBody = (await malformedResponse.json()) as ErrorResponse;
+    expect(malformedBody.disclaimer).toBe(DISCLAIMER);
+    expect(malformedBody).not.toHaveProperty("maintainer_wallet");
+    expect(malformedBody).not.toHaveProperty("royalty_bps");
     expect(invalidResponse.status).toBe(400);
     expect(((await invalidResponse.json()) as ErrorResponse).error).toBe("invalid_request");
   });
@@ -130,7 +188,11 @@ describe("HTTP app", () => {
     });
 
     expect(response.status).toBe(413);
-    expect(((await response.json()) as ErrorResponse).error).toBe("request_too_large");
+    const body = (await response.json()) as ErrorResponse;
+    expect(body.error).toBe("request_too_large");
+    expect(body.disclaimer).toBe(DISCLAIMER);
+    expect(body).not.toHaveProperty("maintainer_wallet");
+    expect(body).not.toHaveProperty("royalty_bps");
   });
 
   it.each([
@@ -152,6 +214,8 @@ describe("HTTP app", () => {
     expect(response.status).toBe(422);
     expect(body.error).toBe("jurisdiction_not_applicable");
     expect(body.disclaimer).toBe(DISCLAIMER);
+    expect(body).not.toHaveProperty("maintainer_wallet");
+    expect(body).not.toHaveProperty("royalty_bps");
   });
 
   it("eu-msb 对任一欧盟成员国 party 受理请求", async () => {
