@@ -13,6 +13,9 @@
 
 - `POST /modules/:id/check` 的 200 响应新增 `maintainer_wallet` 与 `royalty_bps`。
 - 新增全局及按模块覆盖的维护者钱包、版税基点环境配置。
+- 新增双语 README：`README.md`（英文，面向国际评审）与 `README.zh-CN.md`
+  （原中文内容），两者互链、内容忠实对应；两版同时新增版税参数警示（零地址
+  不得转账、`royalty_bps` 不被 `evidence_hash` 背书）。
 
 ### 变更
 
