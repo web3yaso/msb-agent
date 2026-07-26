@@ -45,7 +45,10 @@ describe("HTTP app", () => {
     vi.stubEnv("US_MSB_PAY_TO", "0x1111111111111111111111111111111111111111");
     vi.stubEnv("MODULE_MAINTAINER_WALLET", MAINTAINER_WALLET);
     vi.stubEnv("MODULE_ROYALTY_BPS", "500");
-    app = await createApp({ now: () => new Date("2026-07-24T00:00:00Z") });
+    app = await createApp({
+      now: () => new Date("2026-07-24T00:00:00Z"),
+      accessLog: () => undefined,
+    });
   });
 
   afterAll(() => {
@@ -82,6 +85,104 @@ describe("HTTP app", () => {
     expect(body.disclaimer).toBe(DISCLAIMER);
     expect(body.properties.evidence.properties).toHaveProperty("fincen_msb_registration");
     expect(body.properties.evidence.properties).toHaveProperty("ny_bitlicense");
+  });
+
+  it("GET agent card 免费返回 registration-v1，未注册时证明端点返回 404", async () => {
+    const cardResponse = await app.request("/.well-known/agent-card.json");
+    const card = (await cardResponse.json()) as {
+      type: string;
+      disclaimer: string;
+      description: string;
+    };
+    const registrationResponse = await app.request("/.well-known/agent-registration.json");
+
+    expect(cardResponse.status).toBe(200);
+    expect(cardResponse.headers.get("content-type")).toContain("application/json");
+    expect(cardResponse.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(card.type).toBe("https://eips.ethereum.org/EIPS/eip-8004#registration-v1");
+    expect(card.disclaimer).toBe(DISCLAIMER);
+    expect(card.description).toContain(DISCLAIMER);
+    expect(registrationResponse.status).toBe(404);
+    expect(await registrationResponse.json()).toHaveProperty("disclaimer", DISCLAIMER);
+  });
+
+  it("Arc x402 模式下两个 well-known 端点绝不触发支付", async () => {
+    vi.stubEnv("PUBLIC_BASE_URL", "https://example.test");
+    const arcPaymentConfig = {
+      facilitatorUrl: "https://facilitator.example.test",
+      mode: "x402-arc-testnet",
+      modules: {},
+      network: "arc-testnet",
+    } as const;
+    const arcApp = await createApp({
+      accessLog: () => undefined,
+      paymentConfig: arcPaymentConfig,
+    });
+
+    expect((await arcApp.request("/.well-known/agent-card.json")).status).toBe(200);
+    expect((await arcApp.request("/.well-known/agent-registration.json")).status).toBe(404);
+    vi.stubEnv("PUBLIC_BASE_URL", undefined);
+  });
+
+  it("配置链上身份后证明端点返回 agentId", async () => {
+    vi.stubEnv("ERC8004_AGENT_ID", "123");
+    vi.stubEnv("ERC8004_IDENTITY_REGISTRY", "0x8004A818BFB912233c491871b3d84c89A494BD9e");
+    const registeredApp = await createApp({ accessLog: () => undefined });
+    const response = await registeredApp.request("/.well-known/agent-registration.json");
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      registrations: [{ agentId: 123 }],
+    });
+    vi.stubEnv("ERC8004_AGENT_ID", undefined);
+    vi.stubEnv("ERC8004_IDENTITY_REGISTRY", undefined);
+  });
+
+  it("GET /modules 超过限流窗口上限后返回 429", async () => {
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const limitedApp = await createApp({ accessLog: () => undefined });
+    expect((await limitedApp.request("/modules")).status).toBe(200);
+    const response = await limitedApp.request("/modules");
+    expect(response.status).toBe(429);
+    expect(await response.json()).toHaveProperty("disclaimer", DISCLAIMER);
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
+  });
+
+  it("GET /healthz 连续超过窗口上限次数仍豁免限流", async () => {
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const limitedApp = await createApp({ accessLog: () => undefined });
+    const responses = [
+      await limitedApp.request("/healthz"),
+      await limitedApp.request("/healthz"),
+      await limitedApp.request("/healthz"),
+    ];
+
+    expect(responses.map(({ status }) => status)).toEqual([200, 200, 200]);
+    expect(await responses[0].json()).toEqual({ status: "ok", disclaimer: DISCLAIMER });
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
+  });
+
+  it("身份配置不影响 evidence_hash 与 settlement constraints", async () => {
+    const baselineApp = await createApp({ accessLog: () => undefined });
+    vi.stubEnv("ERC8004_AGENT_ID", "123");
+    vi.stubEnv("ERC8004_IDENTITY_REGISTRY", "0x8004A818BFB912233c491871b3d84c89A494BD9e");
+    const identityApp = await createApp({ accessLog: () => undefined });
+    const request = () => ({
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(completeUsInput),
+    });
+    const baseline = ModuleResponseSchema.parse(
+      await (await baselineApp.request("/modules/us-msb/check", request())).json(),
+    );
+    const withIdentity = ModuleResponseSchema.parse(
+      await (await identityApp.request("/modules/us-msb/check", request())).json(),
+    );
+    expect(withIdentity.evidence_hash).toBe(baseline.evidence_hash);
+    expect(withIdentity.settlement_constraints.evidence_hash).toBe(
+      baseline.settlement_constraints.evidence_hash,
+    );
+    vi.stubEnv("ERC8004_AGENT_ID", undefined);
+    vi.stubEnv("ERC8004_IDENTITY_REGISTRY", undefined);
   });
 
   it("GET /modules 将价格环境变量规范化为六位小数", async () => {
@@ -193,6 +294,35 @@ describe("HTTP app", () => {
     expect(body.disclaimer).toBe(DISCLAIMER);
     expect(body).not.toHaveProperty("maintainer_wallet");
     expect(body).not.toHaveProperty("royalty_bps");
+  });
+
+  it("伪造支付头的 chunked 超限 body 返回 413 且不被完整缓冲", async () => {
+    const totalChunks = 20;
+    let pulledChunks = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulledChunks === totalChunks) {
+          controller.close();
+          return;
+        }
+        pulledChunks += 1;
+        controller.enqueue(new Uint8Array(64 * 1024));
+      },
+    });
+    const request = new Request("http://localhost/modules/us-msb/check", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-payment": "forged-credential",
+      },
+      body: stream,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+
+    const response = await app.request(request);
+
+    expect(response.status).toBe(413);
+    expect(pulledChunks).toBeLessThan(totalChunks);
   });
 
   it.each([

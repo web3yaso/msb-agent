@@ -1,0 +1,64 @@
+{
+  "schema_note": "字段按公开信息自拟（per published schema，查证日期 2026-07-26）；Circle 公布正式 offering schema 后按其重映射，不改变服务行为。",
+  "provider": {
+    "name": "<provider-name>",
+    "contact": "<contact-email>",
+    "repository": "https://github.com/web3yaso/msb-agent"
+  },
+  "service": {
+    "name": "MSB Compliance Module Service",
+    "category": "compliance",
+    "tags": ["compliance", "msb", "kyc-aml", "x402", "regtech", "cross-border-payments"],
+    "description": "四法域跨境汇款 MSB 监管合规检查项状态 API；确定性规则引擎，每条规则带公开法源。按次 x402 收费。本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
+    "base_url": "https://<public-base-url>",
+    "agent_card_url": "https://<public-base-url>/.well-known/agent-card.json",
+    "discovery_endpoints": ["GET /modules", "GET /modules/{id}/schema"],
+    "paid_endpoints": [
+      {
+        "route": "POST /modules/us-msb/check",
+        "price_usdc": "0.800000",
+        "input_schema_url": "https://<public-base-url>/modules/us-msb/schema",
+        "description": "United States MSB checks"
+      },
+      {
+        "route": "POST /modules/eu-msb/check",
+        "price_usdc": "0.600000",
+        "input_schema_url": "https://<public-base-url>/modules/eu-msb/schema",
+        "description": "European Union MSB checks"
+      },
+      {
+        "route": "POST /modules/uk-msb/check",
+        "price_usdc": "0.400000",
+        "input_schema_url": "https://<public-base-url>/modules/uk-msb/schema",
+        "description": "United Kingdom MSB checks"
+      },
+      {
+        "route": "POST /modules/sg-msb/check",
+        "price_usdc": "0.200000",
+        "input_schema_url": "https://<public-base-url>/modules/sg-msb/schema",
+        "description": "Singapore MSB checks"
+      }
+    ]
+  },
+  "payment": {
+    "protocol": "x402",
+    "version": 2,
+    "network": "arc-testnet",
+    "chain_id": 5042002,
+    "asset": "USDC",
+    "facilitator": "Circle hosted testnet facilitator",
+    "settlement": "Circle Gateway balance"
+  },
+  "identity": {
+    "standard": "ERC-8004",
+    "registry": "eip155:5042002:<identity-registry-address>",
+    "agent_id": null
+  },
+  "compliance_posture": {
+    "deterministic": true,
+    "llm_in_decision_path": false,
+    "every_rule_cites_source": true,
+    "verifiability": "evidence_hash = sha256(rules_file_bytes || canonical_input || checks[{id,result}])",
+    "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。"
+  }
+}

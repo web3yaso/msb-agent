@@ -25,6 +25,7 @@ Module（方案流程图 F1–F3）参考实现。
 - [CI 校验](#ci-校验)
 - [测试](#测试)
 - [配置项一览](#配置项一览)
+- [公网部署与链上身份](#公网部署与链上身份)
 
 ## 项目定位
 
@@ -122,13 +123,20 @@ curl http://localhost:3000/modules/us-msb/schema
 
 ## API 概览
 
-三个端点，详细字段/错误码见 **[docs/api.md](docs/api.md)**：
+六个端点，详细字段/错误码见 **[docs/api.md](docs/api.md)**：
 
 ```
-GET  /modules                  免费。列出 4 个模块的定价、收款地址、法源、版本。
-GET  /modules/:id/schema       免费。该模块 evidence 字段的 JSON Schema（由 zod 导出）。
-POST /modules/:id/check        付费（x402）。提交交易信息，返回确定性检查结果。
+GET  /healthz                              免费。部署平台健康检查；唯一豁免限流的端点。
+GET  /modules                              免费。列出 4 个模块的定价、收款地址、法源、版本。
+GET  /modules/:id/schema                   免费。该模块 evidence 字段的 JSON Schema（由 zod 导出）。
+GET  /.well-known/agent-card.json          免费。ERC-8004 registration-v1 agent card。
+GET  /.well-known/agent-registration.json  免费。已注册身份的域名控制证明；未注册时 404。
+POST /modules/:id/check                    付费（x402）。提交交易信息，返回确定性检查结果。
 ```
+
+全部免费发现路径，以及 `POST /modules/:id/check` 支付前的校验路径，均按客户端 IP
+固定窗口限流（默认每分钟 60 次，超限返回 429）。`GET /healthz` 是唯一豁免限流的
+端点，因为它是部署平台用于探活的地址。
 
 `POST /modules/:id/check` 示例（`us-msb`，`PAYMENT_MODE=off`）：
 
@@ -277,6 +285,26 @@ npm test
 `npm test`）：`X402_SMOKE_CLIENT_PRIVATE_KEY`（必填，测试钱包私钥）、
 `SMOKE_ARC_RPC_URL`（可选，自定义 RPC）、`SMOKE_MODULE`（可选，默认 `us-msb`）、
 `SMOKE_PORT`（可选，默认 `4402`）、`SMOKE_DEPOSIT_USDC`（可选，默认 `1.50`）。
+
+## 公网部署与链上身份
+
+Railway 是选定的部署平台，其分配的 HTTPS 子域名即公网地址；Railway 的健康检查指向
+`GET /healthz`，这是唯一豁免限流的端点。部署步骤与两阶段 ERC-8004 注册流程见
+[docs/deploy.md](docs/deploy.md)。在完成 Railway 部署与链上注册这两项人工步骤之前，
+公网 URL、agent card 链接、`agentId` 与 Arcscan 交易链接均有意保持未公布。
+
+两个免费的 `/.well-known/` 端点承载链上身份：`GET /.well-known/agent-card.json` 由服务
+自身的模块元数据与定价确定性派生出一份 ERC-8004 registration-v1 文档（未配置
+`ERC8004_AGENT_ID` 前不含 `registrations` 字段）；`GET /.well-known/agent-registration.json`
+在注册完成后返回域名控制证明（未注册时为 `404`）。注册本身由 `scripts/register-8004.ts`
+执行（`npm run register:8004`，默认只读探测，须显式加 `--confirm` 才发交易），并用
+`scripts/verify-8004.ts`（`npm run verify:8004`）做链上闭环校验；两者均在
+[docs/deploy.md](docs/deploy.md) 中说明。
+
+Circle Agent Marketplace 申请**尚未提交**；机器可读的 offering 元数据见
+[docs/marketplace/offering.json](docs/marketplace/offering.json)，可直接复制的提交材料
+与如实的状态跟踪表见 [docs/marketplace/listing.md](docs/marketplace/listing.md)。本仓库
+不声称该服务已上架或已通过审核。
 
 ---
 

@@ -3,6 +3,23 @@ import type { ModuleId } from "../schemas/index.js";
 export const DISCLAIMER =
   "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。";
 
+export const AGENT_NAME = "MSB Compliance Module Service";
+export const AGENT_SHORT_DESCRIPTION =
+  "四法域（US / UK / EU / SG）跨境汇款 MSB 监管合规检查项状态 API：确定性规则引擎，" +
+  "每条规则带法源引用，按次 x402 收费（Arc Testnet USDC）。" +
+  DISCLAIMER;
+export const AGENT_CATEGORY = "compliance";
+export const AGENT_TAGS = [
+  "compliance",
+  "msb",
+  "kyc-aml",
+  "x402",
+  "regtech",
+  "cross-border-payments",
+] as const;
+export const AGENT_IMAGE_PATH = "/static/agent-icon.png";
+export const AGENT_DOCS_PATH = "/";
+
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 
 export const EU_MEMBER_COUNTRIES = new Set([

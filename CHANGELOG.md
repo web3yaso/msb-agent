@@ -5,6 +5,26 @@
 
 > 本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**。
 
+## [0.3.0] - 2026-07-26
+
+### 新增
+
+- 新增 `GET /healthz` 健康检查端点，供部署平台探活；该端点是限流中间件唯一豁免的路径。
+- 新增 ERC-8004 agent card（`GET /.well-known/agent-card.json`）与域名 registration
+  证明（`GET /.well-known/agent-registration.json`）发现端点。
+- 新增单实例固定窗口限流（免费发现路径 + 付费检查支付前校验路径，默认每分钟 60 次，
+  按凭证独立计数的已付重试宽松桶）、公网 URL 启动校验和最小访问日志。
+- 新增 `scripts/register-8004.ts`（`npm run register:8004`）与 `scripts/verify-8004.ts`
+  （`npm run verify:8004`）：ERC-8004 只读探测、注册、URI 更新与链上闭环校验脚本。
+- 新增 `docs/deploy.md`（Railway 部署手册与四阶段注册流程）与
+  `docs/marketplace/offering.json` / `docs/marketplace/listing.md`（Circle Agent
+  Marketplace 提交材料，申请尚未提交）。
+- 版本号 `0.2.0` → `0.3.0`。
+
+### 未变更（不变量）
+
+- 规则文件、模块版本、规则引擎、既有响应 schema 与 `evidence_hash` 定义均未变更。
+
 ## [0.2.0] - 2026-07-25
 
 对应设计：`docs/design/2026-07-25-hackathon-v2.2-alignment.md`。

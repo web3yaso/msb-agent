@@ -10,13 +10,43 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
 
 ## 端点一览
 
-| 方法 | 路径                  | 收费       | 说明                                      |
-| ---- | --------------------- | ---------- | ----------------------------------------- |
-| GET  | `/modules`            | 否         | 列出 4 个模块的定价、收款地址、法源、版本 |
-| GET  | `/modules/:id/schema` | 否         | 该模块 evidence 字段的 JSON Schema        |
-| POST | `/modules/:id/check`  | 是（x402） | 提交交易信息，返回确定性检查结果          |
+| 方法 | 路径                                   | 收费       | 说明                                      |
+| ---- | -------------------------------------- | ---------- | ----------------------------------------- |
+| GET  | `/healthz`                             | 否         | 部署平台健康检查；唯一豁免限流的端点      |
+| GET  | `/modules`                             | 否         | 列出 4 个模块的定价、收款地址、法源、版本 |
+| GET  | `/modules/:id/schema`                  | 否         | 该模块 evidence 字段的 JSON Schema        |
+| GET  | `/.well-known/agent-card.json`         | 否         | ERC-8004 registration-v1 agent card       |
+| GET  | `/.well-known/agent-registration.json` | 否         | 已注册身份的域名控制证明；未注册时 404    |
+| POST | `/modules/:id/check`                   | 是（x402） | 提交交易信息，返回确定性检查结果          |
 
 `:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`（`ModuleIdSchema`）。
+
+免费发现路径以及付费检查在支付前的校验路径按客户端 IP 固定窗口限流，默认每分钟 60 次。
+超限返回 HTTP 429，响应含 `error=rate_limit_exceeded`、可读 `message` 与
+`disclaimer`。携带付款凭证的请求跳过免费限流。**`GET /healthz` 是唯一豁免限流的
+端点**（供部署平台高频探活使用）；`GET /modules` 与其余免费端点按上述规则正常计入
+限流，不享有豁免。
+
+两个 `/.well-known/` 端点均免费且不进入判定回路。Agent card 响应使用
+`application/json; charset=utf-8` 和 `Cache-Control: public, max-age=300`，包含四模块
+价格、法源、端点、公开支付参数以及免责声明；支付参数不受 `evidence_hash` 背书。
+
+---
+
+## GET /healthz
+
+无需支付，不加载模块元数据，不进入判定回路。固定响应：
+
+```json
+{
+  "status": "ok",
+  "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。"
+}
+```
+
+`disclaimer` 字段与其余端点一致，均为 `DISCLAIMER` 常量原文。本端点是部署平台
+（如 Railway）健康检查应指向的地址，也是限流中间件里唯一 `shouldSkip` 放行的路径，
+不消耗、不计入任何限流窗口。
 
 ---
 

@@ -11,6 +11,7 @@ export { getPaymentCredentialId, getPaymentRetryKey, PaidRetryStore } from "./id
 export {
   createX402Price,
   createPaymentMiddlewares,
+  readPaymentCredential,
   type PaymentRequestState,
   type X402MiddlewareConfig,
   type X402MiddlewareFactory,

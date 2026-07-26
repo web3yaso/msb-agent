@@ -31,15 +31,16 @@ This project is the reference implementation of the 4 Compliance Modules
 - [CI Checks](#ci-checks)
 - [Testing](#testing)
 - [Configuration Reference](#configuration-reference)
+- [Public Deployment and On-chain Identity](#public-deployment-and-on-chain-identity)
 
 ## Project Scope
 
-| Module   | Jurisdiction                                         | Acceptance condition                    |
-| -------- | ----------------------------------------------------- | ---------------------------------------- |
-| `us-msb` | United States (federal + New York State)              | any party with `country = "US"`          |
-| `uk-msb` | United Kingdom                                        | any party with `country = "GB"`          |
+| Module   | Jurisdiction                                           | Acceptance condition                        |
+| -------- | ------------------------------------------------------ | ------------------------------------------- |
+| `us-msb` | United States (federal + New York State)               | any party with `country = "US"`             |
+| `uk-msb` | United Kingdom                                         | any party with `country = "GB"`             |
 | `eu-msb` | European Union (incl. DE/FR/NL member-state specifics) | any party in one of the 27 EU member states |
-| `sg-msb` | Singapore                                             | any party with `country = "SG"`          |
+| `sg-msb` | Singapore                                              | any party with `country = "SG"`             |
 
 **Out of scope**: automated rule updates, multilingual output, KYB/wallet data
 procurement (belongs to Citely F4, a different provider), Jurisdiction Review
@@ -54,10 +55,10 @@ L2 calls this repo over HTTP + x402 paid requests; from L2's perspective this
 repo is a deployed third-party Module vendor, deployed independently and not
 folded into the main-repo monorepo.
 
-| Repository         | Responsibility                                                                    | Relationship                                       |
-| ------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `citely-deal-desk`  | L2/L3/L4 + rubrics, main repo (**TODO: GitHub link to be added once the main repo is public**) | Main repo's README will link back to this repo, forming a mutual link |
-| `msb-agent`         | L1 module-server, this repo, independently deployed                                | Provides the paid Module API to the main repo       |
+| Repository         | Responsibility                                                                                 | Relationship                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `citely-deal-desk` | L2/L3/L4 + rubrics, main repo (**TODO: GitHub link to be added once the main repo is public**) | Main repo's README will link back to this repo, forming a mutual link |
+| `msb-agent`        | L1 module-server, this repo, independently deployed                                            | Provides the paid Module API to the main repo                         |
 
 L2 calls `POST /modules/:id/check`; after a successful payment it reads
 `evidence_hash` from the 200 response (recorded into the SA's `modules_used`),
@@ -154,14 +155,22 @@ HTTP 402 (see below).
 
 ## API Overview
 
-Three endpoints; see **[docs/api.md](docs/api.md)** for detailed fields and
+Six endpoints; see **[docs/api.md](docs/api.md)** for detailed fields and
 error codes:
 
 ```
-GET  /modules                  Free. Lists the 4 modules' pricing, payee address, legal sources, and version.
-GET  /modules/:id/schema       Free. JSON Schema (exported from zod) for that module's evidence fields.
-POST /modules/:id/check        Paid (x402). Submit transaction info, get a deterministic check result.
+GET  /healthz                              Free. Platform health check; the only endpoint exempt from rate limiting.
+GET  /modules                              Free. Lists the 4 modules' pricing, payee address, legal sources, and version.
+GET  /modules/:id/schema                   Free. JSON Schema (exported from zod) for that module's evidence fields.
+GET  /.well-known/agent-card.json          Free. ERC-8004 registration-v1 agent card.
+GET  /.well-known/agent-registration.json  Free. Domain-control proof for a registered on-chain identity; 404 if unregistered.
+POST /modules/:id/check                    Paid (x402). Submit transaction info, get a deterministic check result.
 ```
+
+All free discovery paths, plus the pre-payment validation on
+`POST /modules/:id/check`, are rate limited per client IP (fixed window,
+default 60 requests/minute; `429` on excess). `GET /healthz` is the sole
+exemption, since it is the endpoint deployment platforms poll for liveness.
 
 `POST /modules/:id/check` example (`us-msb`, `PAYMENT_MODE=off`):
 
@@ -216,21 +225,21 @@ for the complete field set):
 Three `PAYMENT_MODE` tiers, **the source-code default is `x402-arc-testnet`**
 (the default is never allowed to be `off` — this is an architectural red line):
 
-| Mode                | Purpose                                                    | Network                       |
-| ------------------- | ------------------------------------------------------------ | ------------------------------ |
-| `off`               | Local development / unit tests; must be set explicitly to take effect | no payment is initiated |
-| `x402-base-sepolia` | Fallback: degraded demo path if the Arc facilitator is unstable | Base Sepolia, `eip155:84532`  |
-| `x402-arc-testnet`  | **Primary target**: Circle's hosted testnet facilitator      | Arc Testnet, `eip155:5042002` |
+| Mode                | Purpose                                                               | Network                       |
+| ------------------- | --------------------------------------------------------------------- | ----------------------------- |
+| `off`               | Local development / unit tests; must be set explicitly to take effect | no payment is initiated       |
+| `x402-base-sepolia` | Fallback: degraded demo path if the Arc facilitator is unstable       | Base Sepolia, `eip155:84532`  |
+| `x402-arc-testnet`  | **Primary target**: Circle's hosted testnet facilitator               | Arc Testnet, `eip155:5042002` |
 
 Differentiated default pricing per module, overridable via the corresponding
 `{MODULE}_PRICE_USDC` environment variable:
 
 | Module   | Price per call (testnet USDC) |
-| -------- | -----------------------------: |
-| `us-msb` |                     `0.800000` |
-| `eu-msb` |                     `0.600000` |
-| `uk-msb` |                     `0.400000` |
-| `sg-msb` |                     `0.200000` |
+| -------- | ----------------------------: |
+| `us-msb` |                    `0.800000` |
+| `eu-msb` |                    `0.600000` |
+| `uk-msb` |                    `0.400000` |
+| `sg-msb` |                    `0.200000` |
 
 Valid price range is `0 < price <= 100`, validated at startup and normalized to
 six decimal places; invalid values immediately abort startup, guarding against
@@ -320,18 +329,18 @@ See `.env.example` for the complete template (copy it to `.env` and adjust as
 needed; never commit real payee addresses/private keys to the repo). Core
 configuration items:
 
-| Variable                                                                              | Description                                                                                  | Default                                                        |
-| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                          | source default `x402-arc-testnet` (`.env.example` explicitly shows `off`) |
-| `PORT`                                                                                | HTTP listen port                                                                             | `3000`                                                          |
-| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | Per-module price per call, up to 6 decimal places                                           | `0.800000` / `0.400000` / `0.600000` / `0.200000` respectively  |
-| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | Per-module payee address (`0x` + 40 hex chars); not validated in `off` mode, required in x402 modes | placeholder address, must be replaced before going live         |
-| `MODULE_MAINTAINER_WALLET`                                                            | Global maintainer royalty payee address; required in x402 modes, overridable per module via the four `{MODULE}_MAINTAINER_WALLET` variables | falls back to the zero address in `off` mode                    |
-| `MODULE_ROYALTY_BPS`                                                                  | Global royalty basis points (integer 0–10000), overridable per module via the four `{MODULE}_ROYALTY_BPS` variables | `0`                                                              |
-| `X402_ARC_TESTNET_FACILITATOR_URL`                                                    | Circle Arc Testnet hosted facilitator URL; used only in `x402-arc-testnet`                  | none (required in that mode)                                    |
-| `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL; used only in `x402-base-sepolia`                               | none (required in that mode)                                    |
-| `CHECK_RULE_LINKS`                                                                    | Set to `1` to enable legal-source link liveness checks (makes network requests)             | `0` (skipped)                                                    |
-| `RULES_BASE_REF`                                                                      | git comparison base ref for the rule-version CI check                                       | `HEAD^`                                                          |
+| Variable                                                                              | Description                                                                                                                                 | Default                                                                   |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                                                                          | source default `x402-arc-testnet` (`.env.example` explicitly shows `off`) |
+| `PORT`                                                                                | HTTP listen port                                                                                                                            | `3000`                                                                    |
+| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | Per-module price per call, up to 6 decimal places                                                                                           | `0.800000` / `0.400000` / `0.600000` / `0.200000` respectively            |
+| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | Per-module payee address (`0x` + 40 hex chars); not validated in `off` mode, required in x402 modes                                         | placeholder address, must be replaced before going live                   |
+| `MODULE_MAINTAINER_WALLET`                                                            | Global maintainer royalty payee address; required in x402 modes, overridable per module via the four `{MODULE}_MAINTAINER_WALLET` variables | falls back to the zero address in `off` mode                              |
+| `MODULE_ROYALTY_BPS`                                                                  | Global royalty basis points (integer 0–10000), overridable per module via the four `{MODULE}_ROYALTY_BPS` variables                         | `0`                                                                       |
+| `X402_ARC_TESTNET_FACILITATOR_URL`                                                    | Circle Arc Testnet hosted facilitator URL; used only in `x402-arc-testnet`                                                                  | none (required in that mode)                                              |
+| `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL; used only in `x402-base-sepolia`                                                                              | none (required in that mode)                                              |
+| `CHECK_RULE_LINKS`                                                                    | Set to `1` to enable legal-source link liveness checks (makes network requests)                                                             | `0` (skipped)                                                             |
+| `RULES_BASE_REF`                                                                      | git comparison base ref for the rule-version CI check                                                                                       | `HEAD^`                                                                   |
 
 Additional variables used only by `npm run smoke:arc` (real on-chain smoke
 test only; does not affect `npm run dev` / `npm test`):
@@ -339,6 +348,30 @@ test only; does not affect `npm run dev` / `npm test`):
 `SMOKE_ARC_RPC_URL` (optional, custom RPC), `SMOKE_MODULE` (optional, default
 `us-msb`), `SMOKE_PORT` (optional, default `4402`), `SMOKE_DEPOSIT_USDC`
 (optional, default `1.50`).
+
+## Public Deployment and On-chain Identity
+
+Railway is the selected deployment platform and its assigned HTTPS subdomain is the canonical
+public address. Its health check is pointed at `GET /healthz`, the only endpoint exempt from
+the rate limiter. Deployment and the two-stage ERC-8004 registration procedure are documented in
+[docs/deploy.md](docs/deploy.md). Until the manual Railway and registration steps are completed,
+the public URL, agent card link, `agentId`, and Arcscan transaction link remain intentionally
+unpublished.
+
+Two free `/.well-known/` endpoints back the on-chain identity: `GET /.well-known/agent-card.json`
+serves an ERC-8004 registration-v1 document derived from the service's own module metadata and
+pricing (no `registrations` entry until `ERC8004_AGENT_ID` is configured), and
+`GET /.well-known/agent-registration.json` serves the domain-control proof once registered
+(`404` until then). Registration itself is performed with `scripts/register-8004.ts`
+(`npm run register:8004`, dry-run by default, `--confirm` to send a transaction) and checked
+end-to-end with `scripts/verify-8004.ts` (`npm run verify:8004`); both are documented in
+[docs/deploy.md](docs/deploy.md).
+
+The Circle Agent Marketplace application has **not yet been submitted**; machine-readable
+offering metadata is in [docs/marketplace/offering.json](docs/marketplace/offering.json), and
+copy-ready application content plus an honest status tracker are in
+[docs/marketplace/listing.md](docs/marketplace/listing.md). This repository does not claim that
+the service is listed or approved.
 
 ---
 

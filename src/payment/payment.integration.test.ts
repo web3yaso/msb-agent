@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { evaluate } from "../engine/index.js";
 import { createApp } from "../http/app.js";
@@ -71,6 +71,14 @@ function paidRequest(): RequestInit {
 }
 
 describe("x402 支付层", () => {
+  beforeAll(() => {
+    vi.stubEnv("PUBLIC_BASE_URL", "https://example.test");
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("Arc 使用 Circle GatewayWalletBatched AssetAmount，Base 保持美元价格", () => {
     const commonConfig = {
       facilitatorUrl: "https://facilitator.example.test",
@@ -112,6 +120,77 @@ describe("x402 支付层", () => {
     expect(paidResponse.status).toBe(200);
     expect(ModuleResponseSchema.parse(await paidResponse.json()).module).toBe("us-msb");
     expect(chargeCount.value).toBe(1);
+  });
+
+  it("免费限流耗尽后已知已付重试仍返回 200", async () => {
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const chargeCount = { value: 0 };
+    let evaluationCount = 0;
+    const flakyEvaluate: typeof evaluate = (...arguments_) => {
+      evaluationCount += 1;
+      if (evaluationCount === 1) throw new Error("simulated engine failure");
+      return evaluate(...arguments_);
+    };
+    const app = await createApp({
+      accessLog: () => undefined,
+      evaluateRules: flakyEvaluate,
+      paymentConfig,
+      royaltyConfig,
+      x402MiddlewareFactory: createMockFacilitator(chargeCount),
+    });
+    const failedResponse = await app.request("/modules/us-msb/check", paidRequest());
+    const retriedResponse = await app.request("/modules/us-msb/check", paidRequest());
+
+    expect(failedResponse.status).toBe(500);
+    expect(retriedResponse.status).toBe(200);
+    expect(chargeCount.value).toBe(1);
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
+  });
+
+  it("已知已付重试按单凭证独立限制为每分钟 60 次", async () => {
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const chargeCount = { value: 0 };
+    let evaluationCount = 0;
+    const alwaysFailEvaluate: typeof evaluate = () => {
+      evaluationCount += 1;
+      throw new Error("simulated engine failure");
+    };
+    const app = await createApp({
+      accessLog: () => undefined,
+      evaluateRules: alwaysFailEvaluate,
+      paymentConfig,
+      royaltyConfig,
+      x402MiddlewareFactory: createMockFacilitator(chargeCount),
+    });
+
+    expect((await app.request("/modules/us-msb/check", paidRequest())).status).toBe(500);
+    for (let requestIndex = 0; requestIndex < 60; requestIndex += 1) {
+      expect((await app.request("/modules/us-msb/check", paidRequest())).status).toBe(500);
+    }
+    expect((await app.request("/modules/us-msb/check", paidRequest())).status).toBe(429);
+    expect(chargeCount.value).toBe(1);
+    expect(evaluationCount).toBe(61);
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
+  });
+
+  it("无效支付凭证不得跳过限流计数", async () => {
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const chargeCount = { value: 0 };
+    const app = await createApp({
+      accessLog: () => undefined,
+      paymentConfig,
+      royaltyConfig,
+      x402MiddlewareFactory: createMockFacilitator(chargeCount),
+    });
+    const invalidRequest = {
+      ...paidRequest(),
+      headers: { "content-type": "application/json", "payment-signature": "invalid" },
+    };
+
+    expect((await app.request("/modules/us-msb/check", invalidRequest)).status).toBe(402);
+    expect((await app.request("/modules/us-msb/check", invalidRequest)).status).toBe(429);
+    expect(chargeCount.value).toBe(0);
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
   });
 
   it("付费后引擎异常时，同一凭证重试不二次收费", async () => {

@@ -76,7 +76,7 @@ function defaultX402MiddlewareFactory(config: X402MiddlewareConfig): MiddlewareH
   );
 }
 
-function readPaymentCredential(request: Request): string | undefined {
+export function readPaymentCredential(request: Request): string | undefined {
   return request.headers.get("payment-signature") ?? request.headers.get("x-payment") ?? undefined;
 }
 
