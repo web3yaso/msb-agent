@@ -14,8 +14,46 @@ Module（方案流程图 F1–F3）参考实现。
 > 也不代表"合规"或"合法"结论。判定回路中不含 LLM——每个 check 结果都由规则引擎
 > 从可审计的规则文件确定性推导，可用 `evidence_hash` 离线重放验证（见下文）。
 
+## 线上服务
+
+服务已部署，公网地址：
+
+**<https://msb-agent-production-769d.up.railway.app>**
+
+以下三条命令可直接复制运行，前两条无需任何配置或支付：
+
+```bash
+# 1. 健康检查（始终免费，豁免限流）
+curl https://msb-agent-production-769d.up.railway.app/healthz
+
+# 2. 免费发现端点：模块列表、定价、收款地址、法源
+curl https://msb-agent-production-769d.up.railway.app/modules
+
+# 3. 不带支付凭证调用付费端点 → 返回 HTTP 402
+curl -i -X POST https://msb-agent-production-769d.up.railway.app/modules/us-msb/check \
+  -H 'content-type: application/json' \
+  -d '{
+    "deal_id": "demo-001",
+    "parties": [
+      { "role": "payer", "country": "US", "state": "NY" },
+      { "role": "payee", "country": "SG" }
+    ],
+    "activity": "money_transmission",
+    "amount_usdc": 10000,
+    "monthly_volume_usdc": null,
+    "evidence": {}
+  }'
+```
+
+第三条命令会返回 `HTTP/2 402`，响应体是空 JSON（`{}`）；真正的 x402 报价单按协议
+编码在 `payment-required` 响应头里（base64），不在响应体中。要完成真实支付并拿到
+`200` 的确定性检查结果，需要使用支持 x402 协议的客户端——参见本仓库的
+`npm run smoke:arc`，或将任何 x402 钱包/客户端指向上述地址并配置
+`PAYMENT_MODE=x402-arc-testnet`。
+
 ## 目录
 
+- [线上服务](#线上服务)
 - [项目定位](#项目定位)
 - [黑客松架构位置（Citely Deal Desk v2.2）](#黑客松架构位置citely-deal-desk-v22)
 - [快速开始](#快速开始)
@@ -288,16 +326,19 @@ npm test
 
 ## 公网部署与链上身份
 
-Railway 是选定的部署平台，其分配的 HTTPS 子域名即公网地址；Railway 的健康检查指向
-`GET /healthz`，这是唯一豁免限流的端点。部署步骤与两阶段 ERC-8004 注册流程见
-[docs/deploy.md](docs/deploy.md)。在完成 Railway 部署与链上注册这两项人工步骤之前，
-公网 URL、agent card 链接、`agentId` 与 Arcscan 交易链接均有意保持未公布。
+Railway 是部署平台；服务已上线，地址为
+<https://msb-agent-production-769d.up.railway.app>（见上文「线上服务」），健康检查
+指向 `GET /healthz`，这是唯一豁免限流的端点。部署步骤与两阶段 ERC-8004 注册流程见
+[docs/deploy.md](docs/deploy.md)。
 
-两个免费的 `/.well-known/` 端点承载链上身份：`GET /.well-known/agent-card.json` 由服务
-自身的模块元数据与定价确定性派生出一份 ERC-8004 registration-v1 文档（未配置
-`ERC8004_AGENT_ID` 前不含 `registrations` 字段）；`GET /.well-known/agent-registration.json`
-在注册完成后返回域名控制证明（未注册时为 `404`）。注册本身由 `scripts/register-8004.ts`
-执行（`npm run register:8004`，默认只读探测，须显式加 `--confirm` 才发交易），并用
+两个免费的 `/.well-known/` 端点承载链上身份：`GET /.well-known/agent-card.json`
+（<https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json>）由
+服务自身的模块元数据与定价确定性派生出一份 ERC-8004 registration-v1 文档；
+`GET /.well-known/agent-registration.json` 在注册完成后返回域名控制证明。**链上注册
+尚未完成**：当前 agent card 不含 `registrations` 字段，
+`GET /.well-known/agent-registration.json` 当前返回 `404`——两者会在配置
+`ERC8004_AGENT_ID` 后更新。注册本身由 `scripts/register-8004.ts` 执行
+（`npm run register:8004`，默认只读探测，须显式加 `--confirm` 才发交易），并用
 `scripts/verify-8004.ts`（`npm run verify:8004`）做链上闭环校验；两者均在
 [docs/deploy.md](docs/deploy.md) 中说明。
 

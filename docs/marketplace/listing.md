@@ -20,8 +20,8 @@ does not constitute legal advice.
 
 - Service name: `MSB Compliance Module Service`
 - Category: `compliance`
-- Base URL: `<Railway 分配的公网 HTTPS URL>`
-- Agent card: `<PUBLIC_BASE_URL>/.well-known/agent-card.json`
+- Base URL: `https://msb-agent-production-769d.up.railway.app`
+- Agent card: `https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json`
 - Repository: `https://github.com/web3yaso/msb-agent`
 - Contact: `<提交人填写>`
 

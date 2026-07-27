@@ -20,8 +20,47 @@ This project is the reference implementation of the 4 Compliance Modules
 > engine from auditable rule files, and can be verified offline by replaying
 > `evidence_hash` (see below).
 
+## Live Demo
+
+The service is deployed and reachable at:
+
+**<https://msb-agent-production-769d.up.railway.app>**
+
+Three commands anyone can run right now — the first two need no setup or payment:
+
+```bash
+# 1. Health check (always free, exempt from rate limiting)
+curl https://msb-agent-production-769d.up.railway.app/healthz
+
+# 2. Free discovery: module list, pricing, payee addresses, legal sources
+curl https://msb-agent-production-769d.up.railway.app/modules
+
+# 3. Paid endpoint called without a payment credential -> HTTP 402
+curl -i -X POST https://msb-agent-production-769d.up.railway.app/modules/us-msb/check \
+  -H 'content-type: application/json' \
+  -d '{
+    "deal_id": "demo-001",
+    "parties": [
+      { "role": "payer", "country": "US", "state": "NY" },
+      { "role": "payee", "country": "SG" }
+    ],
+    "activity": "money_transmission",
+    "amount_usdc": 10000,
+    "monthly_volume_usdc": null,
+    "evidence": {}
+  }'
+```
+
+Command 3 returns `HTTP/2 402` with an empty JSON body (`{}`); the actual x402 price
+quote is base64-encoded in the `payment-required` response header per the x402
+protocol, not in the response body. To complete a real payment and get a `200`
+response with a deterministic check result, use an x402-aware client — see
+`npm run smoke:arc` in this repo, or point any x402 wallet/client at the URL above
+with `PAYMENT_MODE=x402-arc-testnet`.
+
 ## Table of Contents
 
+- [Live Demo](#live-demo)
 - [Project Scope](#project-scope)
 - [Hackathon Architecture Position (Citely Deal Desk v2.2)](#hackathon-architecture-position-citely-deal-desk-v22)
 - [Quick Start](#quick-start)
@@ -351,21 +390,22 @@ test only; does not affect `npm run dev` / `npm test`):
 
 ## Public Deployment and On-chain Identity
 
-Railway is the selected deployment platform and its assigned HTTPS subdomain is the canonical
-public address. Its health check is pointed at `GET /healthz`, the only endpoint exempt from
-the rate limiter. Deployment and the two-stage ERC-8004 registration procedure are documented in
-[docs/deploy.md](docs/deploy.md). Until the manual Railway and registration steps are completed,
-the public URL, agent card link, `agentId`, and Arcscan transaction link remain intentionally
-unpublished.
+Railway is the deployment platform; the service is live at
+<https://msb-agent-production-769d.up.railway.app> (see [Live Demo](#live-demo) above), with
+its health check pointed at `GET /healthz`, the only endpoint exempt from the rate limiter.
+Deployment steps and the two-stage ERC-8004 registration procedure are documented in
+[docs/deploy.md](docs/deploy.md).
 
 Two free `/.well-known/` endpoints back the on-chain identity: `GET /.well-known/agent-card.json`
-serves an ERC-8004 registration-v1 document derived from the service's own module metadata and
-pricing (no `registrations` entry until `ERC8004_AGENT_ID` is configured), and
-`GET /.well-known/agent-registration.json` serves the domain-control proof once registered
-(`404` until then). Registration itself is performed with `scripts/register-8004.ts`
-(`npm run register:8004`, dry-run by default, `--confirm` to send a transaction) and checked
-end-to-end with `scripts/verify-8004.ts` (`npm run verify:8004`); both are documented in
-[docs/deploy.md](docs/deploy.md).
+(<https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json>) serves an
+ERC-8004 registration-v1 document derived from the service's own module metadata and pricing,
+and `GET /.well-known/agent-registration.json` will serve the domain-control proof once
+registered. **On-chain registration has not been completed yet**: the agent card currently has
+no `registrations` entry, and `GET /.well-known/agent-registration.json` currently returns
+`404` — both will be updated once `ERC8004_AGENT_ID` is configured. Registration itself is
+performed with `scripts/register-8004.ts` (`npm run register:8004`, dry-run by default,
+`--confirm` to send a transaction) and checked end-to-end with `scripts/verify-8004.ts`
+(`npm run verify:8004`); both are documented in [docs/deploy.md](docs/deploy.md).
 
 The Circle Agent Marketplace application has **not yet been submitted**; machine-readable
 offering metadata is in [docs/marketplace/offering.json](docs/marketplace/offering.json), and

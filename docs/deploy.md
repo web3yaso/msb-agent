@@ -2,10 +2,15 @@
 
 > 本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。
 
+当前线上实例：<https://msb-agent-production-769d.up.railway.app>（Railway，已实测
+`/healthz`、`/modules`、`/.well-known/agent-card.json`、`POST /modules/:id/check`
+的 402 报价流程；见 README「Live Demo / 线上服务」小节的可复制 curl 示例）。
+
 ## Railway 部署
 
 1. 在 Railway 创建项目并连接 `web3yaso/msb-agent` 仓库，保持单实例常驻。
-2. 按下方清单注入环境变量，明确设置 `PAYMENT_MODE=x402-arc-testnet`。
+2. 按下方清单注入环境变量，明确设置 `PAYMENT_MODE=x402-arc-testnet`，**并显式设置
+   `PORT=3000`**（见下方「已知坑」）。
 3. 首次部署后生成 Railway 分配的 `*.up.railway.app` HTTPS 子域名。
 4. 将 `PUBLIC_BASE_URL` 设置为该 Railway URL 后重新部署。
 5. Railway 健康检查使用 `GET /healthz`；该专用端点豁免应用层限流。
@@ -18,6 +23,16 @@ Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选�
 
 启动失败应先检查环境变量，不要通过修改代码绕过 fail-fast。规则文件必须保留在 Node
 文件系统中，服务必须保持单实例，否则进程内付款重试状态无法共享。
+
+### 已知坑（2026-07-27 部署过程实测记录）
+
+- **必须显式设置 `PORT=3000`**：Railway 不会自动注入 `PORT` 环境变量。若缺失，服务
+  监听的端口与 Railway 边缘代理转发的目标端口对不上，会出现「健康检查通过、但对外
+  请求 502」的现象——`/healthz` 走的是 Railway 内部探活路径，可能先于边缘路由暴露
+  问题被发现，掩盖了端口不匹配。部署前务必确认 `PORT` 与域名目标端口一致。
+- **变量填写后必须点击 Deploy 应用**：Railway 控制台修改/新增环境变量后默认停留在
+  staged（待应用）状态，不会自动生效；必须手动触发一次 Deploy，新配置才会应用到
+  运行中的实例。
 
 ## 环境变量
 

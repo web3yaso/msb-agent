@@ -6,7 +6,9 @@
 本文档与 `src/schemas/` 下的 zod schema 保持一致（字段名、枚举值、必填/可选性均以
 zod 定义为准；本文示例均来自可通过 `npm test` 复现的实际请求/响应，不是凭记忆编写）。
 
-Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。
+Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当前线上实例：
+`https://msb-agent-production-769d.up.railway.app`（Railway，见 README「Live Demo /
+线上服务」小节）。
 
 ## 端点一览
 
