@@ -10,6 +10,12 @@
 4. 将 `PUBLIC_BASE_URL` 设置为该 Railway URL 后重新部署。
 5. Railway 健康检查使用 `GET /healthz`；该专用端点豁免应用层限流。
 
+依赖安装必须走 `npm ci`（按 package-lock.json 的 integrity 校验安装，esbuild 等带
+install script 的依赖由锁文件背书；Railway/Railpack 默认即 `npm ci`，勿改用忽略锁文件的方式）。
+服务由 `npm start` 启动（`node --import tsx src/index.ts`，生产环境经 tsx 直跑 TypeScript 源码，
+不产出编译产物——规则文件原始字节是 evidence_hash 输入，不引入拷贝/重排环节）。
+Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选择运行时）。
+
 启动失败应先检查环境变量，不要通过修改代码绕过 fail-fast。规则文件必须保留在 Node
 文件系统中，服务必须保持单实例，否则进程内付款重试状态无法共享。
 
