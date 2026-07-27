@@ -143,6 +143,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
   const paymentRequestStates = new WeakMap<Request, PaymentRequestState>();
   const paymentMiddlewares = await createPaymentMiddlewares(
     paymentConfig,
+    publicBaseUrl,
     paymentRequestStates,
     retryStore,
     options.x402MiddlewareFactory,

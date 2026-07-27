@@ -87,6 +87,7 @@ describe("x402 支付层", () => {
       payTo: PAY_TO,
       priceAtomic: "1000000",
       priceUsdc: "1.000000",
+      resource: "https://example.test/modules/us-msb/check",
     } as const;
 
     expect(createX402Price({ ...commonConfig, network: "arc-testnet" })).toEqual({
@@ -120,6 +121,35 @@ describe("x402 支付层", () => {
     expect(paidResponse.status).toBe(200);
     expect(ModuleResponseSchema.parse(await paidResponse.json()).module).toBe("us-msb");
     expect(chargeCount.value).toBe(1);
+  });
+
+  it("入站为内部 HTTP URL 时，402 resource.url 使用 PUBLIC_BASE_URL", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        kinds: [{ network: "eip155:84532", scheme: "exact", x402Version: 2 }],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const app = await createApp({
+      paymentConfig,
+      royaltyConfig,
+    });
+
+    const response = await app.request("http://internal-host/modules/us-msb/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(validInput),
+    });
+    const encodedQuote = response.headers.get("payment-required");
+    const quote = JSON.parse(Buffer.from(encodedQuote ?? "", "base64").toString("utf8")) as {
+      resource: { url: string };
+    };
+
+    expect(response.status).toBe(402);
+    expect(encodedQuote).not.toBeNull();
+    expect(quote.resource.url).toBe("https://example.test/modules/us-msb/check");
+    expect(quote.resource.url.startsWith("https://example.test")).toBe(true);
+    vi.unstubAllGlobals();
   });
 
   it("免费限流耗尽后已知已付重试仍返回 200", async () => {

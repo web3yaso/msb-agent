@@ -17,6 +17,7 @@ export interface X402MiddlewareConfig {
   payTo: `0x${string}`;
   priceAtomic: string;
   priceUsdc: string;
+  resource: string;
 }
 
 export type X402MiddlewareFactory = (
@@ -69,6 +70,7 @@ function defaultX402MiddlewareFactory(config: X402MiddlewareConfig): MiddlewareH
         },
         description: `${config.moduleId} deterministic compliance check`,
         mimeType: "application/json",
+        resource: config.resource,
       },
     },
     facilitatorClient,
@@ -82,6 +84,7 @@ export function readPaymentCredential(request: Request): string | undefined {
 
 export async function createPaymentMiddlewares(
   config: PaymentConfig,
+  publicBaseUrl: string,
   requestStates: WeakMap<Request, PaymentRequestState>,
   retryStore: PaidRetryStore,
   factory: X402MiddlewareFactory = defaultX402MiddlewareFactory,
@@ -104,6 +107,7 @@ export async function createPaymentMiddlewares(
         moduleId,
         network,
         path,
+        resource: `${publicBaseUrl}${path}`,
       });
 
       const middleware: MiddlewareHandler = async (context, next) => {
