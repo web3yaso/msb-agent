@@ -19,6 +19,9 @@
 - 新增 `docs/deploy.md`（Railway 部署手册与四阶段注册流程）与
   `docs/marketplace/offering.json` / `docs/marketplace/listing.md`（Circle Agent
   Marketplace 提交材料，申请尚未提交）。
+- API 文档拆分为双语版本：`docs/api.md`（英文，供 Circle Marketplace 申请表单的
+  Documentation URL 引用）与新增的 `docs/api.zh-CN.md`（中文，原文完整迁移）；
+  README.md / README.zh-CN.md 中指向 `docs/api.md` 的交叉链接与锚点同步更新。
 - 版本号 `0.2.0` → `0.3.0`。
 
 ### 未变更（不变量）

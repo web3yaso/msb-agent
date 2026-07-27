@@ -27,11 +27,11 @@ does not constitute legal advice.
 
 ## 链上身份
 
-- 步骤 0a 字段与地址人工复核：`<待人工填写>`
-- 步骤 0c 只读探测输出：`<待人工粘贴>`
-- Identity Registry：`<待人工填写>`
-- Agent ID：`<待人工填写>`
-- Transaction hash：`<待人工填写>`
+- 步骤 0a 字段与地址人工复核：已完成（2026-07-26，对照 EIP-8004 原文修正 endpoints→services，QA 独立 curl 原文复核）
+- 步骤 0c 只读探测输出：chainId=5042002 / codeBytes=130 / name=AgentIdentity / symbol=AGENT（2026-07-27，经 https://arc-testnet.drpc.org）
+- Identity Registry：`0x8004A818BFB912233c491871b3d84c89A494BD9e`（Arc Testnet）
+- Agent ID：`851930`
+- Transaction hash：[`0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097`](https://testnet.arcscan.app/tx/0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097)
 
 ## 状态跟踪
 

@@ -173,7 +173,7 @@ HTTP 402 (see below).
   rule file bytes themselves are not JSON-canonicalized — the file is a
   versioned artifact, and its bytes are its identity. See
   `src/evidence-hash/evidence-hash.ts` for the algorithm implementation and
-  [docs/api.md](docs/api.md#evidence_hash-与-settlement_constraints) for
+  [docs/api.md](docs/api.md#evidence_hash-and-settlement_constraints) for
   field-level semantics.
 
 - **Threshold rules are a conservative single-transaction lower bound**: legal
@@ -399,13 +399,16 @@ Deployment steps and the two-stage ERC-8004 registration procedure are documente
 Two free `/.well-known/` endpoints back the on-chain identity: `GET /.well-known/agent-card.json`
 (<https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json>) serves an
 ERC-8004 registration-v1 document derived from the service's own module metadata and pricing,
-and `GET /.well-known/agent-registration.json` will serve the domain-control proof once
-registered. **On-chain registration has not been completed yet**: the agent card currently has
-no `registrations` entry, and `GET /.well-known/agent-registration.json` currently returns
-`404` — both will be updated once `ERC8004_AGENT_ID` is configured. Registration itself is
-performed with `scripts/register-8004.ts` (`npm run register:8004`, dry-run by default,
-`--confirm` to send a transaction) and checked end-to-end with `scripts/verify-8004.ts`
-(`npm run verify:8004`); both are documented in [docs/deploy.md](docs/deploy.md).
+and `GET /.well-known/agent-registration.json` serves the domain-control proof.
+**On-chain registration is complete**: Identity Registry
+`0x8004A818BFB912233c491871b3d84c89A494BD9e` (Arc Testnet), Agent ID `851930`, registration
+transaction
+[`0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097`](https://testnet.arcscan.app/tx/0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097).
+Both the agent card's `registrations` entry and `GET /.well-known/agent-registration.json`
+(`200`) reflect this live. Registration itself was performed with `scripts/register-8004.ts`
+(`npm run register:8004`, dry-run by default, `--confirm` to send a transaction) and checked
+end-to-end with `scripts/verify-8004.ts` (`npm run verify:8004`); both are documented in
+[docs/deploy.md](docs/deploy.md).
 
 The Circle Agent Marketplace application has **not yet been submitted**; machine-readable
 offering metadata is in [docs/marketplace/offering.json](docs/marketplace/offering.json), and

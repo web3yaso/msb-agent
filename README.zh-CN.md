@@ -94,7 +94,7 @@ SA 的 `modules_used`），以及 `maintainer_wallet` / `royalty_bps`（用于�
 账本 `category=royalty`）。本仓库只输出检查项状态；PASS/HOLD/ESCALATE 的结算编排
 与 SA 生成均在 L2。本仓库不含 LLM，也不产出法律意见。
 
-> **版税参数警示**（详见 [docs/api.md](docs/api.md)）：`maintainer_wallet` 为
+> **版税参数警示**（详见 [docs/api.zh-CN.md](docs/api.zh-CN.md)）：`maintainer_wallet` 为
 > `0x000…000` 零地址表示本实例未配置版税收款方，采购方必须视为"不支付版税"，
 > **不得向零地址转账**；`royalty_bps` 是运营参数，**不被 `evidence_hash` 背书**，
 > 采购方须按自身白名单与单笔上限校验后再支付版税。
@@ -148,20 +148,20 @@ curl http://localhost:3000/modules/us-msb/schema
   影响 hash；`canon(checks)` 只保留 `{id, result}`（不含 `reason` 文案，修正措辞不
   改变 hash）。规则文件字节本身不做 JSON 规范化——文件是版本化产物，字节即身份。
   算法实现见 `src/evidence-hash/evidence-hash.ts`，字段级语义见
-  [docs/api.md](docs/api.md#evidence_hash-与-settlement_constraints)。
+  [docs/api.zh-CN.md](docs/api.zh-CN.md#evidence_hash-与-settlement_constraints)。
 
 - **门槛类规则是单笔安全下界**：法源门槛多为聚合口径（如美国货币兑换
   $1,000/人/日累计、新加坡 SPI/MPI 月均交易量分级）；引擎只看单笔/月交易量输入，
   语义是"单笔 ≥ 门槛 ⇒ 聚合必然 ≥ 门槛"的保守触发方向，单笔未达门槛时**不输出
   PASS**（只能输出 HOLD，说明聚合情形需采购方自行核实）。详见
-  [docs/api.md](docs/api.md)。
+  [docs/api.zh-CN.md](docs/api.zh-CN.md)。
 - **法域受理边界**：只要请求中**任一** party 落在模块法域内即受理（模块外因素以
   `ESCALATE` 检查项表达）；**全部** party 都在法域外才返回 422——这条边界是有意
   设计的，防止用 422 绕过"规则表达不了就 ESCALATE"的不变量。
 
 ## API 概览
 
-六个端点，详细字段/错误码见 **[docs/api.md](docs/api.md)**：
+六个端点，详细字段/错误码见 **[docs/api.zh-CN.md](docs/api.zh-CN.md)**：
 
 ```
 GET  /healthz                              免费。部署平台健康检查；唯一豁免限流的端点。
@@ -194,7 +194,7 @@ curl -X POST http://localhost:3000/modules/us-msb/check \
   }'
 ```
 
-响应节选（未提交任何证据，`overall` 为 `HOLD`；完整字段见 docs/api.md）：
+响应节选（未提交任何证据，`overall` 为 `HOLD`；完整字段见 docs/api.zh-CN.md）：
 
 ```json
 {
@@ -290,7 +290,7 @@ CHECK_RULE_LINKS=1 npm run check:links   # 法源链接存活检查；未设置�
 npm test
 ```
 
-三层测试（详见 `docs/api.md` 或对应源码）：
+三层测试（详见 `docs/api.zh-CN.md` 或对应源码）：
 
 1. 引擎单元测试：每条规则至少一个触发/不触发用例 + 确定性测试（同输入两次求值
    `checks`/`evidence_hash` 完全一致）；
@@ -334,10 +334,12 @@ Railway 是部署平台；服务已上线，地址为
 两个免费的 `/.well-known/` 端点承载链上身份：`GET /.well-known/agent-card.json`
 （<https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json>）由
 服务自身的模块元数据与定价确定性派生出一份 ERC-8004 registration-v1 文档；
-`GET /.well-known/agent-registration.json` 在注册完成后返回域名控制证明。**链上注册
-尚未完成**：当前 agent card 不含 `registrations` 字段，
-`GET /.well-known/agent-registration.json` 当前返回 `404`——两者会在配置
-`ERC8004_AGENT_ID` 后更新。注册本身由 `scripts/register-8004.ts` 执行
+`GET /.well-known/agent-registration.json` 返回域名控制证明。**链上注册已完成**：
+Identity Registry `0x8004A818BFB912233c491871b3d84c89A494BD9e`（Arc Testnet）、
+Agent ID `851930`、注册交易
+[`0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097`](https://testnet.arcscan.app/tx/0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097)。
+agent card 的 `registrations` 字段与 `GET /.well-known/agent-registration.json`
+（返回 `200`）均已实测反映该状态。注册本身由 `scripts/register-8004.ts` 执行
 （`npm run register:8004`，默认只读探测，须显式加 `--confirm` 才发交易），并用
 `scripts/verify-8004.ts`（`npm run verify:8004`）做链上闭环校验；两者均在
 [docs/deploy.md](docs/deploy.md) 中说明。

@@ -1,43 +1,73 @@
-# API 文档
+# API Documentation
 
-> **免责声明**：本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**。
-> 判定回路中不含 LLM——`checks` 只能由规则引擎从 `src/rules/*.json` 确定性推导。
+English | [简体中文](api.zh-CN.md)
 
-本文档与 `src/schemas/` 下的 zod schema 保持一致（字段名、枚举值、必填/可选性均以
-zod 定义为准；本文示例均来自可通过 `npm test` 复现的实际请求/响应，不是凭记忆编写）。
+> **Disclaimer**: this service's output is a check-item status compiled from public
+> legal sources, **it does not constitute legal advice**. There is no LLM in the
+> decision loop — `checks` can only be derived deterministically by the rule engine
+> from `src/rules/*.json`.
 
-Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当前线上实例：
-`https://msb-agent-production-769d.up.railway.app`（Railway，见 README「Live Demo /
-线上服务」小节）。
+This document is kept consistent with the zod schemas in `src/schemas/` (field
+names, enum values, and required/optional-ness all follow the zod definitions;
+every example below comes from an actual request/response reproducible via
+`npm test`, not written from memory).
 
-## 端点一览
+> **Note on literal string values**: throughout this document, JSON example values
+> that the live service returns verbatim — the `disclaimer` field, `reason` text,
+> and error `message` text — are preserved in the original Chinese, because that is
+> what the service actually returns (see the `DISCLAIMER` constant in
+> `src/http/constants.ts` and the message literals in `src/http/app.ts`). This is
+> consistent across every module and code path; translating them here would make
+> this document diverge from verifiable, actual output. Everything else in this
+> document — field names, prose, and schema descriptions — is in English.
 
-| 方法 | 路径                                   | 收费       | 说明                                      |
-| ---- | -------------------------------------- | ---------- | ----------------------------------------- |
-| GET  | `/healthz`                             | 否         | 部署平台健康检查；唯一豁免限流的端点      |
-| GET  | `/modules`                             | 否         | 列出 4 个模块的定价、收款地址、法源、版本 |
-| GET  | `/modules/:id/schema`                  | 否         | 该模块 evidence 字段的 JSON Schema        |
-| GET  | `/.well-known/agent-card.json`         | 否         | ERC-8004 registration-v1 agent card       |
-| GET  | `/.well-known/agent-registration.json` | 否         | 已注册身份的域名控制证明；未注册时 404    |
-| POST | `/modules/:id/check`                   | 是（x402） | 提交交易信息，返回确定性检查结果          |
+Base URL: local development defaults to `http://localhost:3000` (`PORT`
+configurable). Current live instance:
+`https://msb-agent-production-769d.up.railway.app` (Railway; see the README
+"Live Demo" section).
 
-`:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`（`ModuleIdSchema`）。
+## Endpoint Overview
 
-免费发现路径以及付费检查在支付前的校验路径按客户端 IP 固定窗口限流，默认每分钟 60 次。
-超限返回 HTTP 429，响应含 `error=rate_limit_exceeded`、可读 `message` 与
-`disclaimer`。携带付款凭证的请求跳过免费限流。**`GET /healthz` 是唯一豁免限流的
-端点**（供部署平台高频探活使用）；`GET /modules` 与其余免费端点按上述规则正常计入
-限流，不享有豁免。
+| Method | Path                                    | Paid       | Description                                                           |
+| ------ | ---------------------------------------- | ---------- | ---------------------------------------------------------------------- |
+| GET    | `/`                                       | No         | Service directory JSON (name, description, endpoint map, repository)  |
+| GET    | `/healthz`                               | No         | Deployment-platform health check; the only endpoint exempt from rate limiting |
+| GET    | `/static/agent-icon.png`                 | No         | Agent card icon image                                                  |
+| GET    | `/modules`                               | No         | Lists the 4 modules' pricing, payee address, legal sources, and version |
+| GET    | `/modules/:id/schema`                    | No         | JSON Schema for that module's evidence fields                          |
+| GET    | `/.well-known/agent-card.json`           | No         | ERC-8004 registration-v1 agent card                                    |
+| GET    | `/.well-known/agent-registration.json`   | No         | Domain-control proof for a registered identity; `404` if unregistered  |
+| POST   | `/modules/:id/check`                     | Yes (x402) | Submit transaction info, get a deterministic check result              |
 
-两个 `/.well-known/` 端点均免费且不进入判定回路。Agent card 响应使用
-`application/json; charset=utf-8` 和 `Cache-Control: public, max-age=300`，包含四模块
-价格、法源、端点、公开支付参数以及免责声明；支付参数不受 `evidence_hash` 背书。
+`:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` (`ModuleIdSchema`).
+
+Free discovery paths, and the pre-payment validation path on the paid check
+endpoint, are rate limited per client IP with a fixed window, default 60
+requests/minute. Excess requests return HTTP 429 with a response body
+containing `error=rate_limit_exceeded`, a human-readable `message`, and
+`disclaimer`. Requests with an invalid or unverified payment credential still
+count against the free-tier rate limit. Only retries of an already-settled
+payment (within the 24-hour idempotency window) use a separate per-credential
+bucket (default 60 requests/minute). **`GET /healthz` is the only endpoint
+exempt from rate limiting** (intended for high-frequency polling by
+deployment platforms); `GET /modules` and the other free endpoints — including
+`GET /` and `GET /static/agent-icon.png` — are rate limited normally per the
+rules above; they are **not** exempt.
+
+Both `/.well-known/` endpoints are free and never enter the decision loop. The
+agent card response uses `application/json; charset=utf-8` and
+`Cache-Control: public, max-age=300`, and includes the four modules' pricing,
+legal sources, endpoints, public payment parameters, and the disclaimer;
+payment parameters are **not** covered by `evidence_hash`. `GET
+/static/agent-icon.png` (the image the agent card's `image` field points to)
+is served with `Cache-Control: public, max-age=86400`.
 
 ---
 
 ## GET /healthz
 
-无需支付，不加载模块元数据，不进入判定回路。固定响应：
+No payment required; does not load module metadata; never enters the decision
+loop. Fixed response:
 
 ```json
 {
@@ -46,15 +76,17 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 }
 ```
 
-`disclaimer` 字段与其余端点一致，均为 `DISCLAIMER` 常量原文。本端点是部署平台
-（如 Railway）健康检查应指向的地址，也是限流中间件里唯一 `shouldSkip` 放行的路径，
-不消耗、不计入任何限流窗口。
+The `disclaimer` field is the same `DISCLAIMER` constant used by every other
+endpoint. This is the address deployment platforms (e.g. Railway) should point
+their health check at; it is also the only path the rate-limit middleware's
+`shouldSkip` allows through — it never consumes or counts against any rate
+limit window.
 
 ---
 
 ## GET /modules
 
-无需支付。响应：
+No payment required. Response:
 
 ```json
 {
@@ -81,26 +113,30 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 }
 ```
 
-字段语义：
+Field semantics:
 
-- `jurisdiction`：`United States` / `United Kingdom` / `European Union` / `Singapore`
-  （固定字符串，见 `src/http/constants.ts` 的 `MODULE_JURISDICTIONS`）；
-- `price_usdc`：来自 `{MODULE}_PRICE_USDC` 或模块源码默认价，并统一规范化为六位小数；
-  `pay_to` 直接读自 `{MODULE}_PAY_TO`。两者是公开信息，**不是秘密**；`pay_to`
-  未配置时返回空字符串；
-- `sources`：该模块规则文件里全部 `{source, source_url, accessed_date}` 的去重集合
-  （按 `source_url` 去重）；
-- `input_schema_url`：指向 `GET /modules/:id/schema`，采购方可据此预知需提交哪些
-  `evidence` 键，无需试错。
+- `jurisdiction`: `United States` / `United Kingdom` / `European Union` /
+  `Singapore` (fixed strings, see `MODULE_JURISDICTIONS` in
+  `src/http/constants.ts`);
+- `price_usdc`: sourced from `{MODULE}_PRICE_USDC` or the module's source-code
+  default price, normalized to six decimal places; `pay_to` is read directly
+  from `{MODULE}_PAY_TO`. Both are public information, **not secrets**;
+  `pay_to` returns an empty string when unconfigured;
+- `sources`: the de-duplicated set of every `{source, source_url,
+  accessed_date}` entry in that module's rule file (de-duplicated by
+  `source_url`);
+- `input_schema_url`: points to `GET /modules/:id/schema`, so a purchaser can
+  know in advance which `evidence` keys to submit, without trial and error.
 
 ## GET /modules/:id/schema
 
-无需支付。返回该模块输入的 JSON Schema（由 zod 通过 `z.toJSONSchema()` 导出），
-`evidence` 子 schema 的属性集合是该模块规则文件中全部 `required_evidence` 的**并
-集**（`src/http/module-loader.ts` 的 `createInputSchema`）。响应额外附加顶层
-`disclaimer` 字段。
+No payment required. Returns the JSON Schema for that module's input (exported
+from zod via `z.toJSONSchema()`); the property set of the `evidence`
+sub-schema is the **union** of every `required_evidence` entry across that
+module's rule file (`createInputSchema` in `src/http/module-loader.ts`). The
+response also carries a top-level `disclaimer` field.
 
-未知模块 → `404`：
+Unknown module → `404`:
 
 ```json
 { "error": "module_not_found", "message": "未知模块", "disclaimer": "..." }
@@ -108,28 +144,28 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 
 ## POST /modules/:id/check
 
-付费端点（x402，见下文「支付与错误码」）。
+Paid endpoint (x402; see "Payment and Error Codes" below).
 
-### 请求体（`DealInputSchema`，`z.strictObject`，多余字段会被拒绝）
+### Request Body (`DealInputSchema`, `z.strictObject`, extra fields are rejected)
 
-| 字段                  | 类型                      | 必填            | 说明                                                                                                  |
-| --------------------- | ------------------------- | --------------- | ----------------------------------------------------------------------------------------------------- |
-| `deal_id`             | `string`（非空）          | 是              | 由采购方生成的交易标识，回显进 `settlement_constraints.deal_id`                                       |
-| `parties`             | `Party[]`（至少 1 项）    | 是              | 交易参与方                                                                                            |
-| `activity`            | `enum`                    | 是              | `money_transmission` \| `currency_exchange` \| `stored_value` \| `crypto_transfer` \| `check_cashing` |
-| `amount_usdc`         | `number`（≥ 0）           | 是              | 单笔交易金额，单位 USDC                                                                               |
-| `monthly_volume_usdc` | `number`（≥ 0）\| `null`  | 否              | 月交易量；交易量分级类检查项（如新加坡 SPI/MPI）依赖此字段，缺失时相关检查项输出 `HOLD`               |
-| `evidence`            | `Record<string, unknown>` | 是（可为 `{}`） | 证据键值对，键集合见该模块 `GET /modules/:id/schema`                                                  |
+| Field                  | Type                       | Required        | Description                                                                                            |
+| ---------------------- | --------------------------- | --------------- | -------------------------------------------------------------------------------------------------------- |
+| `deal_id`               | `string` (non-empty)       | Yes              | Transaction identifier generated by the purchaser, echoed into `settlement_constraints.deal_id`         |
+| `parties`               | `Party[]` (at least 1 item) | Yes              | Transaction participants                                                                                 |
+| `activity`              | `enum`                      | Yes              | `money_transmission` \| `currency_exchange` \| `stored_value` \| `crypto_transfer` \| `check_cashing`    |
+| `amount_usdc`           | `number` (≥ 0)              | Yes              | Single-transaction amount, in USDC                                                                       |
+| `monthly_volume_usdc`   | `number` (≥ 0) \| `null`    | No               | Monthly transaction volume; volume-tiered check items (e.g. Singapore SPI/MPI) depend on this field, and output `HOLD` when it is missing |
+| `evidence`              | `Record<string, unknown>`  | Yes (`{}` is OK) | Evidence key/value pairs; the key set is that module's `GET /modules/:id/schema`                        |
 
-`Party`（`z.strictObject`）：
+`Party` (`z.strictObject`):
 
-| 字段      | 类型                        | 必填 | 说明                             |
-| --------- | --------------------------- | ---- | -------------------------------- |
-| `role`    | `"payer"` \| `"payee"`      | 是   |                                  |
-| `country` | `string`，匹配 `^[A-Z]{2}$` | 是   | ISO 3166-1 alpha-2               |
-| `state`   | `string`（非空）            | 否   | 目前仅 `us-msb` 的纽约州规则用到 |
+| Field     | Type                          | Required | Description                                   |
+| --------- | ------------------------------ | -------- | ---------------------------------------------- |
+| `role`    | `"payer"` \| `"payee"`         | Yes      |                                                 |
+| `country` | `string`, matching `^[A-Z]{2}$` | Yes      | ISO 3166-1 alpha-2                             |
+| `state`   | `string` (non-empty)           | No       | Currently only used by `us-msb`'s New York rule |
 
-请求示例：
+Request example:
 
 ```json
 {
@@ -145,70 +181,77 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 }
 ```
 
-### 响应体（`ModuleResponseSchema`）
+### Response Body (`ModuleResponseSchema`)
 
-| 字段                     | 类型                                                | 说明                                                                                                                            |
-| ------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `module`                 | `ModuleId`                                          | 回显请求的模块                                                                                                                  |
-| `version`                | `string`，`^\d{4}\.\d{2}\.\d+$`                     | 规则文件版本（如 `2026.07.1`）                                                                                                  |
-| `updated_at`             | ISO8601 UTC（无偏移量后缀，`YYYY-MM-DDTHH:mm:ssZ`） | 规则文件最后修订时间                                                                                                            |
-| `maintainer_wallet`      | `string`，`^0x[0-9a-fA-F]{40}$`                     | Module 维护者版税收款地址；零地址表示实例未配置版税收款方，采购方必须视为“不支付版税”，不得向零地址转账                         |
-| `royalty_bps`            | `integer`，0–10000                                  | 版税基点（10000 = 100%），基数为本次调用采购价；该运营参数不被 `evidence_hash` 背书，采购方须按自身白名单与单笔上限校验后再支付 |
-| `checks`                 | `CheckResult[]`                                     | 见下                                                                                                                            |
-| `overall`                | `"PASS"` \| `"HOLD"` \| `"ESCALATE"`                | 聚合结果，见「聚合语义」                                                                                                        |
-| `settlement_constraints` | `SettlementConstraints`                             | 见下                                                                                                                            |
-| `evidence_hash`          | 64 位十六进制字符串                                 | 与 `settlement_constraints.evidence_hash` 相同                                                                                  |
-| `disclaimer`             | `string`                                            | 固定免责声明文案                                                                                                                |
+| Field                     | Type                                                       | Description                                                                                                                                             |
+| ------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `module`                  | `ModuleId`                                                   | Echoes the requested module                                                                                                                              |
+| `version`                 | `string`, `^\d{4}\.\d{2}\.\d+$`                               | Rule file version (e.g. `2026.07.1`)                                                                                                                     |
+| `updated_at`               | ISO8601 UTC (no offset suffix, `YYYY-MM-DDTHH:mm:ssZ`)        | Rule file's last-revised timestamp                                                                                                                        |
+| `maintainer_wallet`         | `string`, `^0x[0-9a-fA-F]{40}$`                               | Module maintainer's royalty payee address; the zero address means this instance has no royalty payee configured — purchasers **must** treat this as "no royalty due" and **must not** transfer to the zero address |
+| `royalty_bps`              | `integer`, 0–10000                                           | Royalty in basis points (10000 = 100%), based on this call's purchase price; this is an operational parameter **not covered by `evidence_hash`** — purchasers must validate against their own allow-list and per-transaction cap before paying it |
+| `checks`                   | `CheckResult[]`                                               | See below                                                                                                                                                 |
+| `overall`                  | `"PASS"` \| `"HOLD"` \| `"ESCALATE"`                          | Aggregate result, see "Aggregation Semantics"                                                                                                             |
+| `settlement_constraints`   | `SettlementConstraints`                                       | See below                                                                                                                                                 |
+| `evidence_hash`            | 64-character hex string                                       | Identical to `settlement_constraints.evidence_hash`                                                                                                       |
+| `disclaimer`                | `string`                                                      | Fixed disclaimer text                                                                                                                                    |
 
-`CheckResult`：
+`CheckResult`:
 
-| 字段     | 说明                                                             |
-| -------- | ---------------------------------------------------------------- |
-| `id`     | 规则 id，如 `us-fincen-registration-money-transmission`          |
-| `result` | `PASS` \| `HOLD` \| `ESCALATE`                                   |
-| `reason` | 人类可读原因（不参与 `evidence_hash` 计算，措辞修正不改变 hash） |
-| `source` | 法源引用（对应规则文件 `source` 字段）                           |
+| Field    | Description                                                                              |
+| -------- | ------------------------------------------------------------------------------------------ |
+| `id`     | Rule id, e.g. `us-fincen-registration-money-transmission`                                  |
+| `result` | `PASS` \| `HOLD` \| `ESCALATE`                                                              |
+| `reason` | Human-readable reason (not part of `evidence_hash`; wording fixes never change the hash)    |
+| `source` | Legal source citation (corresponds to the rule file's `source` field)                       |
 
-`SettlementConstraints`：
+`SettlementConstraints`:
 
-| 字段                        | 说明                                                                                                                                                                   |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `module` / `module_version` | 冗余自根字段，便于独立传入结算层且自证来源                                                                                                                             |
-| `deal_id`                   | 回显请求 `deal_id`                                                                                                                                                     |
-| `valid_until`               | 请求时间（UTC）+ 72 小时，ISO8601。**`PASS` 时**表示"72h 内本结果可被结算层引用"；**`HOLD`/`ESCALATE` 时**表示"72h 内本阻断状态可被引用"——过期不等于放行，只表示需重查 |
-| `blocked_check_ids`         | 仅含 `result = HOLD` 的 check id（"缺证据暂停付款"路由）                                                                                                               |
-| `escalated_check_ids`       | 仅含 `result = ESCALATE` 的 check id（"灰区转人工"路由，与上者分开路由）                                                                                               |
-| `evidence_hash`             | 同响应根字段                                                                                                                                                           |
+| Field                          | Description                                                                                                                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `module` / `module_version`      | Redundant copies of the root fields, so the payload is self-describing when passed to the settlement layer independently                                                                                                       |
+| `deal_id`                        | Echoes the request's `deal_id`                                                                                                                                                                                                  |
+| `valid_until`                    | Request time (UTC) + 72 hours, ISO8601. **When `PASS`**, means "this result may be referenced by the settlement layer within 72h"; **when `HOLD`/`ESCALATE`**, means "this blocking state may be referenced within 72h" — expiry does not imply approval, it only means the case needs to be re-checked |
+| `blocked_check_ids`              | Only the ids of checks with `result = HOLD` (the "missing evidence, hold payment" routing path)                                                                                                                                 |
+| `escalated_check_ids`            | Only the ids of checks with `result = ESCALATE` (the "gray area, route to human review" path, kept separate from the above)                                                                                                     |
+| `evidence_hash`                  | Identical to the root-level field                                                                                                                                                                                                |
 
-### 聚合语义
+### Aggregation Semantics
 
-任一 check `ESCALATE` → `overall = ESCALATE`；否则任一 `HOLD` → `overall = HOLD`；
-否则 `overall = PASS`（`src/engine/engine.ts` 的 `aggregateCheckStatus`，
-`ESCALATE > HOLD > PASS` 优先级）。
+Any check with `ESCALATE` → `overall = ESCALATE`; otherwise any check with
+`HOLD` → `overall = HOLD`; otherwise `overall = PASS` (`aggregateCheckStatus`
+in `src/engine/engine.ts`, priority order `ESCALATE > HOLD > PASS`).
 
-### `evidence_hash` 与 `settlement_constraints`
+### `evidence_hash` and `settlement_constraints`
 
 ```
 evidence_hash = sha256( rules_file_bytes || 0x1F || canon(input) || 0x1F || canon(checks) )
 ```
 
-- `rules_file_bytes`：该模块规则文件的原始 UTF-8 字节（不做 JSON 规范化——文件本身
-  是版本化产物，字节即身份）；
-- `canon(input)`：`{deal_id, parties, activity, amount_usdc, monthly_volume_usdc?,
-evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符串 NFC）；
-  `parties` 先按 `(role, country, state)` 排序，数组书写顺序不影响 hash；
-  `monthly_volume_usdc` 为 `undefined` 时整个字段省略（不是写入 `null`）；
-- `canon(checks)`：仅 `{id, result}` 数组，按 `id` 排序后规范化——**不含
-  `reason`**，修正措辞不改变 hash，只有 `result` 变化才是实质变更；
-- `0x1F`（Unit Separator）分隔三段，各段自身合法 JSON/UTF-8，消除拼接歧义。
+- `rules_file_bytes`: the module's rule file's raw UTF-8 bytes (not
+  JSON-canonicalized — the file itself is a versioned artifact, and its bytes
+  are its identity);
+- `canon(input)`: `{deal_id, parties, activity, amount_usdc,
+  monthly_volume_usdc?, evidence}` canonicalized in RFC 8785 (JCS) style (keys
+  sorted lexicographically, no whitespace, strings in NFC); `parties` is
+  sorted by `(role, country, state)` first, so array write order does not
+  affect the hash; when `monthly_volume_usdc` is `undefined` the whole field
+  is omitted (not written as `null`);
+- `canon(checks)`: an array of only `{id, result}`, sorted by `id` then
+  canonicalized — **excluding `reason`**, so wording fixes never change the
+  hash; only a `result` change is a substantive change;
+- `0x1F` (Unit Separator) separates the three segments; each segment is itself
+  valid JSON/UTF-8, eliminating concatenation ambiguity.
 
-该算法是公开规范，采购方或第三方审计者可用相同规则文件、相同请求体、相同 checks
-离线重放验证 `evidence_hash`（实现见 `src/evidence-hash/evidence-hash.ts`，golden
-测试对已知输入的具体 hash 值断言，见 `src/golden/citely-demo.test.ts`）。
+This algorithm is a public specification; a purchaser or third-party auditor
+can offline-replay `evidence_hash` from the same rule file, the same request
+body, and the same `checks` (implementation in
+`src/evidence-hash/evidence-hash.ts`; the golden tests assert specific hash
+values for known inputs, see `src/golden/citely-demo.test.ts`).
 
-### 示例：完整证据 → `PASS`
+### Example: Complete Evidence → `PASS`
 
-请求 `evidence` 补全 `us-msb` 全部所需字段后：
+Once the request's `evidence` fills in every field `us-msb` requires:
 
 ```json
 {
@@ -220,7 +263,7 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
 }
 ```
 
-### 示例：无证据 → `HOLD`（节选自 golden 测试固定快照）
+### Example: No Evidence → `HOLD` (excerpted from the golden test's fixed snapshot)
 
 ```json
 {
@@ -287,11 +330,13 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
 }
 ```
 
-### 示例：`ESCALATE`（`eu-msb`，节选）
+### Example: `ESCALATE` (`eu-msb`, excerpt)
 
-`eu-amlr-2027-applicability` 规则 `always_escalate: true`（AMLR 已生效但主体条款自
-2027-07-10 起才适用，规则表达不了"过渡期尚未适用"这一时间维度，因此转人工而不是
-静默跳过或误判为违规）：
+The `eu-amlr-2027-applicability` rule has `always_escalate: true` (AMLR is
+already in force, but its main-body provisions only apply starting
+2027-07-10; the rule engine has no way to express "not yet applicable during
+the transition period", so this is routed to human review instead of being
+silently skipped or misjudged as a violation):
 
 ```json
 {
@@ -302,49 +347,72 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
 }
 ```
 
-带任一 `ESCALATE` 的响应 `overall = "ESCALATE"`，对应 check id 出现在
-`settlement_constraints.escalated_check_ids`（不出现在 `blocked_check_ids`）。
+A response with any `ESCALATE` has `overall = "ESCALATE"`, and the
+corresponding check id appears in
+`settlement_constraints.escalated_check_ids` (not in `blocked_check_ids`).
 
-### 门槛类检查项（金额/交易量下界判定）
+### Threshold-Based Check Items (amount / volume lower-bound determination)
 
-规则的 `when.amount_gte` / `when.monthly_volume_gte` 表达"单笔/月交易量下界"，语义：
+The rule fields `when.amount_gte` / `when.monthly_volume_gte` express a
+"single-transaction / monthly-volume lower bound". Semantics:
 
-- `amount_gte` 是**单笔下界判定**：单笔 `amount_usdc ≥ amount_gte` 才触发证据要求；
-  法源门槛多为聚合口径（如美国货币兑换 $1,000/人/日累计），单笔 ≥ 门槛可以安全推出
-  聚合必然 ≥ 门槛，但**单笔 < 门槛不能推出聚合 < 门槛**，因此规则条件"未触发"时
-  仍输出 `HOLD`（`reason: "单笔未达门槛，聚合情形需采购方自行核实"`），**不输出
-  `PASS`**；
-- `monthly_volume_gte` 依赖可选字段 `monthly_volume_usdc`：缺失（`undefined` 或
-  `null`）→ 相关检查项 `HOLD`，`reason: "无法判定分级，需补交易量数据"`；达到该字段
-  但低于门槛 → `PASS`，`reason: "月交易量未达规则门槛"`；
-- 币种统一假设 USDC ≈ USD；非美元法源门槛（如新加坡 SGD）在规则文件里写死换算后的
-  USDC 门槛值，`note` 字段标注换算汇率与换算日期，引擎内部不做隐式汇率换算。
-
----
-
-## 支付与错误码
-
-| 状态码 | 触发条件                                                                                                                                                            | 响应体要点                                                                                                                                                             |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `200`  | 校验通过、法域受理、（付费模式下）支付成功                                                                                                                          | 见上文 `ModuleResponseSchema`                                                                                                                                          |
-| `400`  | 请求体不是合法 JSON，或不满足 `DealInputSchema`（**不收费**，在 x402 中间件之前完成校验）                                                                           | `{ "error": "invalid_request", "issues": [{ "path": [...], "message": "..." }], "disclaimer": "..." }`                                                                 |
-| `402`  | 仅 `PAYMENT_MODE = x402-base-sepolia` / `x402-arc-testnet` 时，请求未携带有效支付凭证                                                                               | x402 标准 `PAYMENT-REQUIRED` 响应头 + 402 payload（由 `@x402/hono` 生成，非本服务自定义 JSON）                                                                         |
-| `404`  | `:id` 不是 `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`                                                                                                             | `{ "error": "module_not_found", ... }`                                                                                                                                 |
-| `413`  | 请求体超过 256KB                                                                                                                                                    | `{ "error": "request_too_large", "message": "请求体不得超过 256KB", "disclaimer": "..." }`                                                                             |
-| `422`  | Schema 校验通过，但**全部** party 均不在模块法域内（法域受理边界：**任一** party 在法域内即受理，422 只在全部 party 都不在时触发，避免用 422 绕过 ESCALATE 不变量） | `{ "error": "jurisdiction_not_applicable", "message": "全部交易方均不在 <法域> 模块适用法域内", "disclaimer": "..." }`                                                 |
-| `500`  | 支付结算成功后引擎求值/序列化抛异常                                                                                                                                 | `{ "error": "internal_error", "message": "检查执行失败，可使用同一支付凭证重试", "payment_credential_id": "<sha256(凭证)>"（若已收到支付凭证）, "disclaimer": "..." }` |
-| `502`  | facilitator 不可达（支付验证/结算请求失败，且尚未确认扣款）                                                                                                         | `{ "error": "facilitator_unavailable", "message": "支付服务暂不可用，请稍后重试", "disclaimer": "..." }`；不产生半计费状态                                             |
-
-**付费后幂等**：x402 支付被接受后，若引擎求值或响应序列化抛异常（→ 500），服务记录
-支付凭证哈希（`sha256(凭证)`，不落原始凭证）与请求体哈希的组合键；同一支付凭证对
-同一 `:id` + 请求体在 **24 小时内**重试 `POST /modules/:id/check`，会跳过二次收费，
-直接重新求值返回结果（`src/payment/idempotency.ts` 的 `PaidRetryStore`，滑动窗口
-`24 * 60 * 60 * 1000` 毫秒）。
-
-请求处理顺序：**请求体大小（413）→ zod 校验（400）→ 法域受理（422）→ x402 中间件
-（402/502）→ 规则引擎求值（200，异常态 500）**——无效请求或法域外请求不会进入付费
-流程。
+- `amount_gte` is a **single-transaction lower-bound test**: the evidence
+  requirement is only triggered when the single-transaction
+  `amount_usdc ≥ amount_gte`; legal thresholds are often expressed in
+  aggregate terms (e.g. US currency exchange's $1,000/person/day cumulative
+  threshold) — a single transaction ≥ the threshold can safely imply the
+  aggregate is ≥ the threshold, but **a single transaction < the threshold
+  cannot imply the aggregate < the threshold**. So when the rule condition is
+  "not triggered", the engine still outputs `HOLD`
+  (`reason: "单笔未达门槛，聚合情形需采购方自行核实"`), **never `PASS`**;
+- `monthly_volume_gte` depends on the optional `monthly_volume_usdc` field:
+  when missing (`undefined` or `null`) → the relevant check item is `HOLD`,
+  `reason: "无法判定分级，需补交易量数据"`; when present but below the
+  threshold → `PASS`, `reason: "月交易量未达规则门槛"`;
+- Currency is uniformly assumed as USDC ≈ USD; non-USD legal thresholds (e.g.
+  Singapore's SGD) are hard-coded in the rule file as already-converted USDC
+  threshold values, with the conversion rate and conversion date noted in the
+  `note` field — the engine performs no implicit currency conversion.
 
 ---
 
-本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**。
+## Payment and Error Codes
+
+| Status | Trigger condition                                                                                                                                                      | Response body highlights                                                                                                                                             |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `200`  | Validation passed, jurisdiction accepted, (in paid modes) payment succeeded                                                                                            | See `ModuleResponseSchema` above                                                                                                                                        |
+| `400`  | Request body is not valid JSON, or fails `DealInputSchema` (**not charged**, validated before the x402 middleware)                                                    | `{ "error": "invalid_request", "issues": [{ "path": [...], "message": "..." }], "disclaimer": "..." }`                                                                 |
+| `402`  | Only when `PAYMENT_MODE = x402-base-sepolia` / `x402-arc-testnet`, request carries no valid payment credential                                                        | Standard x402 `PAYMENT-REQUIRED` response header + 402 payload (generated by `@x402/hono`, not custom JSON written by this service — see below)                       |
+| `404`  | `:id` is not one of `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`                                                                                                        | `{ "error": "module_not_found", ... }`                                                                                                                                  |
+| `413`  | Request body exceeds 256KB                                                                                                                                              | `{ "error": "request_too_large", "message": "请求体不得超过 256KB", "disclaimer": "..." }`                                                                             |
+| `422`  | Schema validation passed, but **every** party is outside the module's jurisdiction (jurisdiction acceptance boundary: **any** party inside the jurisdiction is accepted; `422` only fires when all parties are outside, to prevent using `422` to bypass the "escalate when rules can't express it" invariant) | `{ "error": "jurisdiction_not_applicable", "message": "全部交易方均不在 <法域> 模块适用法域内", "disclaimer": "..." }`                                                 |
+| `500`  | Engine evaluation or response serialization throws after payment settlement has succeeded                                                                              | `{ "error": "internal_error", "message": "检查执行失败，可使用同一支付凭证重试", "payment_credential_id": "<sha256(credential)>" (if a payment credential was received), "disclaimer": "..." }` |
+| `502`  | Facilitator unreachable (payment verification/settlement request failed, and no charge has been confirmed)                                                             | `{ "error": "facilitator_unavailable", "message": "支付服务暂不可用，请稍后重试", "disclaimer": "..." }`; produces no half-charged state                              |
+
+**On the `402` response**: the response body is an empty JSON object (`{}`);
+the actual x402 price quote is not in the body, it is base64-encoded in the
+`payment-required` response header, per the x402 protocol (verified live
+against the deployed instance; see the README "Live Demo" section for a
+copy-pasteable example). An x402-aware client decodes that header
+automatically — a plain `curl` without x402 support will only see `402` and
+an empty body.
+
+**Idempotency after payment**: once an x402 payment has been accepted, if
+engine evaluation or response serialization then throws (→ `500`), the
+service records a composite key made of the payment credential's hash
+(`sha256(credential)`, the raw credential itself is never stored) and the
+request body's hash. The same payment credential retried against the same
+`:id` + request body **within 24 hours** skips being charged a second time,
+and directly re-evaluates and returns the result (`PaidRetryStore` in
+`src/payment/idempotency.ts`, sliding window of `24 * 60 * 60 * 1000`
+milliseconds).
+
+Request processing order: **request-body size (`413`) → zod validation
+(`400`) → jurisdiction acceptance (`422`) → x402 middleware (`402`/`502`) →
+rule engine evaluation (`200`, exception state `500`)** — invalid requests or
+requests outside the jurisdiction never enter the paid flow.
+
+---
+
+This service's output is a check-item status compiled from public legal
+sources, **it does not constitute legal advice**.

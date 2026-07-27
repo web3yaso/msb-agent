@@ -19,6 +19,11 @@ interface DiscoveryResponse {
   }[];
 }
 
+interface ServiceDirectoryResponse {
+  disclaimer: string;
+  endpoints: Record<string, string>;
+}
+
 const completeUsInput = {
   deal_id: "job-123",
   parties: [
@@ -70,6 +75,34 @@ describe("HTTP app", () => {
         input_schema_url: "/modules/us-msb/schema",
       }),
     );
+  });
+
+  it("GET / 返回服务目录和免责声明", async () => {
+    const response = await app.request("/");
+    const body = (await response.json()) as ServiceDirectoryResponse;
+
+    expect(response.status).toBe(200);
+    expect(body.disclaimer).toBe(DISCLAIMER);
+    expect(body.endpoints).toEqual(
+      expect.objectContaining({
+        modules: "/modules",
+        check: "/modules/{id}/check (x402 paid)",
+        schema: "/modules/{id}/schema",
+        agent_card: "/.well-known/agent-card.json",
+        agent_registration: "/.well-known/agent-registration.json",
+        health: "/healthz",
+      }),
+    );
+  });
+
+  it("GET /static/agent-icon.png 返回缓存的 PNG", async () => {
+    const response = await app.request("/static/agent-icon.png");
+    const body = await response.arrayBuffer();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=86400");
+    expect(body.byteLength).toBeGreaterThan(0);
   });
 
   it("GET /modules/:id/schema 生成模块 evidence schema 并保留免责声明", async () => {
@@ -130,6 +163,24 @@ describe("HTTP app", () => {
     vi.stubEnv("PUBLIC_BASE_URL", undefined);
   });
 
+  it("Arc x402 模式下根路径和图标端点绝不触发支付", async () => {
+    vi.stubEnv("PUBLIC_BASE_URL", "https://example.test");
+    const arcPaymentConfig = {
+      facilitatorUrl: "https://facilitator.example.test",
+      mode: "x402-arc-testnet",
+      modules: {},
+      network: "arc-testnet",
+    } as const;
+    const arcApp = await createApp({
+      accessLog: () => undefined,
+      paymentConfig: arcPaymentConfig,
+    });
+
+    expect((await arcApp.request("/")).status).toBe(200);
+    expect((await arcApp.request("/static/agent-icon.png")).status).toBe(200);
+    vi.stubEnv("PUBLIC_BASE_URL", undefined);
+  });
+
   it("配置链上身份后证明端点返回 agentId", async () => {
     vi.stubEnv("ERC8004_AGENT_ID", "123");
     vi.stubEnv("ERC8004_IDENTITY_REGISTRY", "0x8004A818BFB912233c491871b3d84c89A494BD9e");
@@ -150,6 +201,15 @@ describe("HTTP app", () => {
     const response = await limitedApp.request("/modules");
     expect(response.status).toBe(429);
     expect(await response.json()).toHaveProperty("disclaimer", DISCLAIMER);
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
+  });
+
+  it.each(["/", "/static/agent-icon.png"])("%s 超过限流窗口上限后返回 429", async (path) => {
+    vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", "1");
+    const limitedApp = await createApp({ accessLog: () => undefined });
+
+    expect((await limitedApp.request(path)).status).toBe(200);
+    expect((await limitedApp.request(path)).status).toBe(429);
     vi.stubEnv("RATE_LIMIT_MAX_REQUESTS", undefined);
   });
 

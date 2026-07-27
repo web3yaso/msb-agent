@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 
@@ -25,6 +27,7 @@ import {
 } from "../schemas/index.js";
 import { buildAgentCard, buildAgentRegistration } from "./agent-card.js";
 import {
+  AGENT_NAME,
   DISCLAIMER,
   EU_MEMBER_COUNTRIES,
   MODULE_JURISDICTIONS,
@@ -35,6 +38,8 @@ import { resolvePublicBaseUrl } from "./public-url.js";
 import { createRateLimiter } from "./rate-limit.js";
 
 const MODULE_MAINTAINER = "MSB Compliance Module Service";
+const SERVICE_DESCRIPTION = "Deterministic MSB compliance checks for cross-border payments.";
+const REPOSITORY_URL = "https://github.com/web3yaso/msb-agent";
 const RESULT_VALIDITY_MS = 72 * 60 * 60 * 1000;
 const PAID_RETRY_MAX_REQUESTS = 60;
 
@@ -99,7 +104,10 @@ function getModule(
  * 创建已加载规则的 HTTP 应用；支付中间件由步骤 11 在 check 路由边界接入。
  */
 export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
-  const modules = await loadModules();
+  const [modules, agentIcon] = await Promise.all([
+    loadModules(),
+    readFile(new URL("./static/agent-icon.png", import.meta.url)),
+  ]);
   const now = options.now ?? (() => new Date());
   const evaluateRules = options.evaluateRules ?? evaluate;
   const paymentConfig = options.paymentConfig ?? loadPaymentConfig();
@@ -216,11 +224,36 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
         : undefined;
     },
   });
+  app.use("/", rateLimiter);
+  app.use("/static/agent-icon.png", rateLimiter);
   app.use("/healthz", rateLimiter);
   app.use("/modules", rateLimiter);
   app.use("/modules/:id/schema", rateLimiter);
   app.use("/.well-known/*", rateLimiter);
   app.use("/modules/:id/check", rateLimiter);
+
+  app.get("/", (context) =>
+    context.json({
+      name: AGENT_NAME,
+      description: SERVICE_DESCRIPTION,
+      endpoints: {
+        modules: "/modules",
+        check: "/modules/{id}/check (x402 paid)",
+        schema: "/modules/{id}/schema",
+        agent_card: "/.well-known/agent-card.json",
+        agent_registration: "/.well-known/agent-registration.json",
+        health: "/healthz",
+      },
+      repository: REPOSITORY_URL,
+      disclaimer: DISCLAIMER,
+    }),
+  );
+
+  app.get("/static/agent-icon.png", (context) => {
+    context.header("Content-Type", "image/png");
+    context.header("Cache-Control", "public, max-age=86400");
+    return context.body(agentIcon);
+  });
 
   app.get("/healthz", (context) => context.json({ status: "ok", disclaimer: DISCLAIMER }));
 
