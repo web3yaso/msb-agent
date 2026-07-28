@@ -37,6 +37,10 @@ describe("agent card", () => {
     expect((card["x-msb"] as { no_llm_in_decision_path: boolean }).no_llm_in_decision_path).toBe(
       true,
     );
+    expect(card["x-msb"]).toMatchObject({
+      engine_version: "1.0.0",
+      hash_scheme_version: "2",
+    });
   });
 
   it("四模块元数据、价格和法源完整", () => {

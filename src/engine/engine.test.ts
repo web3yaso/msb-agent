@@ -83,7 +83,8 @@ describe("evaluate", () => {
         encodeRules(rules),
       ).checks[0],
     ).toMatchObject({
-      result: "PASS",
+      result: "NOT_APPLICABLE",
+      basis: "not_applicable",
       reason: "规则条件未触发",
     });
   });
@@ -100,6 +101,7 @@ describe("evaluate", () => {
 
     expect(result.checks[0]).toMatchObject({
       result: "HOLD",
+      basis: "insufficient_aggregate_data",
       reason: "单笔未达门槛，聚合情形需采购方自行核实",
     });
   });
@@ -117,17 +119,19 @@ describe("evaluate", () => {
       evaluate(rules, { ...baseInput, amount_usdc: 20_000 }, rulesBytes).checks[0],
     ).toMatchObject({
       result: "PASS",
+      basis: "caller_assertion",
       reason: "所需证据齐全",
     });
     expect(
       evaluate(rules, { ...baseInput, amount_usdc: 20_001 }, rulesBytes).checks[0],
     ).toMatchObject({
       result: "PASS",
+      basis: "caller_assertion",
       reason: "所需证据齐全",
     });
   });
 
-  it("月交易量缺失时 HOLD，明确低于门槛时 PASS", () => {
+  it("月交易量缺失时 HOLD，明确低于门槛时标记为不适用", () => {
     const volumeRule: Rule = {
       ...baseRule,
       id: "sg-monthly-volume",
@@ -140,10 +144,12 @@ describe("evaluate", () => {
       evaluate(rules, { ...baseInput, monthly_volume_usdc: null }, encodeRules(rules)).checks[0],
     ).toMatchObject({
       result: "HOLD",
+      basis: "insufficient_aggregate_data",
       reason: "无法判定分级，需补交易量数据",
     });
     expect(evaluate(rules, baseInput, encodeRules(rules)).checks[0]).toMatchObject({
-      result: "PASS",
+      result: "NOT_APPLICABLE",
+      basis: "deterministic_threshold",
       reason: "月交易量未达规则门槛",
     });
   });
@@ -161,6 +167,7 @@ describe("evaluate", () => {
       evaluate(rules, { ...baseInput, monthly_volume_usdc: 6_000_000 }, rulesBytes).checks[0],
     ).toMatchObject({
       result: "PASS",
+      basis: "caller_assertion",
       reason: "所需证据齐全",
     });
     expect(
@@ -175,6 +182,7 @@ describe("evaluate", () => {
       ).checks[0],
     ).toMatchObject({
       result: "HOLD",
+      basis: "missing_evidence",
       reason: "缺少所需证据：fincen_registration",
     });
   });
@@ -193,7 +201,7 @@ describe("evaluate", () => {
     expect(result.overall).toBe("ESCALATE");
   });
 
-  it("activity 不匹配时输出条件未触发的 PASS", () => {
+  it("activity 不匹配时输出 NOT_APPLICABLE", () => {
     const activityRule: Rule = {
       ...baseRule,
       id: "currency-exchange-only",
@@ -206,7 +214,8 @@ describe("evaluate", () => {
     const rules = [activityRule];
 
     expect(evaluate(rules, baseInput, encodeRules(rules)).checks[0]).toMatchObject({
-      result: "PASS",
+      result: "NOT_APPLICABLE",
+      basis: "not_applicable",
       reason: "规则条件未触发",
     });
   });
@@ -237,7 +246,8 @@ describe("evaluate", () => {
         rulesBytes,
       ).checks[0],
     ).toMatchObject({
-      result: "PASS",
+      result: "NOT_APPLICABLE",
+      basis: "not_applicable",
       reason: "规则条件未触发",
     });
   });
@@ -254,6 +264,7 @@ describe("evaluate", () => {
       evaluate(rules, { ...baseInput, evidence: {} }, encodeRules(rules)).checks[0],
     ).toMatchObject({
       result: "HOLD",
+      basis: "missing_evidence",
       reason: "缺少所需证据：toString",
     });
   });
@@ -273,6 +284,7 @@ describe("evaluate", () => {
     expect(result.checks).toHaveLength(rules.length);
     expect(result.checks[0]).toMatchObject({
       result: "ESCALATE",
+      basis: "manual_review",
       source: escalationRule.source,
     });
   });
@@ -304,15 +316,34 @@ describe("aggregateCheckStatus", () => {
   const createCheck = (result: CheckResult["result"]): CheckResult => ({
     id: result,
     result,
+    basis: result === "NOT_APPLICABLE" ? "not_applicable" : "caller_assertion",
     reason: result,
     source: "测试法源",
   });
 
-  it("按 ESCALATE、HOLD、PASS 顺序取最坏状态", () => {
+  it("按 ESCALATE、HOLD、PASS 顺序取最坏状态，并将 NOT_APPLICABLE 视为中性", () => {
     expect(aggregateCheckStatus([createCheck("PASS")])).toBe("PASS");
-    expect(aggregateCheckStatus([createCheck("PASS"), createCheck("HOLD")])).toBe("HOLD");
+    expect(aggregateCheckStatus([createCheck("NOT_APPLICABLE"), createCheck("PASS")])).toBe("PASS");
     expect(
-      aggregateCheckStatus([createCheck("PASS"), createCheck("HOLD"), createCheck("ESCALATE")]),
+      aggregateCheckStatus([
+        createCheck("NOT_APPLICABLE"),
+        createCheck("PASS"),
+        createCheck("HOLD"),
+      ]),
+    ).toBe("HOLD");
+    expect(
+      aggregateCheckStatus([
+        createCheck("NOT_APPLICABLE"),
+        createCheck("PASS"),
+        createCheck("HOLD"),
+        createCheck("ESCALATE"),
+      ]),
     ).toBe("ESCALATE");
+  });
+
+  it("所有检查均不适用时返回 NOT_APPLICABLE", () => {
+    expect(
+      aggregateCheckStatus([createCheck("NOT_APPLICABLE"), createCheck("NOT_APPLICABLE")]),
+    ).toBe("NOT_APPLICABLE");
   });
 });

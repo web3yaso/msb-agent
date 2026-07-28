@@ -70,16 +70,31 @@ const response = await gatewayClient.pay(
 ```json
 {
   "module": "us-msb",
-  "checks": [{ "id": "...", "result": "PASS | HOLD | ESCALATE", "reason": "...", "source": "..." }],
-  "overall": "PASS | HOLD | ESCALATE",
-  "settlement_constraints": { "blocked_check_ids": [], "escalated_check_ids": [], "evidence_hash": "..." },
+  "engine_version": "1.0.0",
+  "hash_scheme_version": "2",
+  "checks": [
+    {
+      "id": "...",
+      "result": "PASS | HOLD | ESCALATE | NOT_APPLICABLE",
+      "basis": "...",
+      "reason": "...",
+      "source": "..."
+    }
+  ],
+  "overall": "PASS | HOLD | ESCALATE | NOT_APPLICABLE",
+  "settlement_constraints": {
+    "blocked_check_ids": [],
+    "escalated_check_ids": [],
+    "evidence_hash": "..."
+  },
   "evidence_hash": "...",
   "disclaimer": "..."
 }
 ```
 
-`evidence_hash` 是对规则文件字节、规范化输入、规范化 checks 三段的 sha256——任何
-人都可以用相同的公开规则文件离线重放验证结果。逐字段完整参考见
+`evidence_hash` 是对版本上下文、规则文件字节、规范化输入、规范化 checks 的
+sha256——任何人都可以用相同的公开规则文件离线重放，确认这些材料和结果未被修改。
+它不证明调用方提交的证据真实。逐字段完整参考见
 **[docs/api.zh-CN.md](docs/api.zh-CN.md)**。
 
 ### 立即体验

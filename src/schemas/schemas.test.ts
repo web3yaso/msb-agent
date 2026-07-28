@@ -32,6 +32,7 @@ const validDealInput = {
 const validCheckResult = {
   id: "us-fincen-registration",
   result: "HOLD",
+  basis: "missing_evidence",
   reason: "缺少 FinCEN MSB 注册证据",
   source: "31 CFR § 1022.380",
 };
@@ -108,6 +109,8 @@ describe("响应 schemas", () => {
       ModuleResponseSchema.safeParse({
         module: "us-msb",
         version: "2026.07.1",
+        engine_version: "1.0.0",
+        hash_scheme_version: "2",
         updated_at: "2026-07-24T00:00:00Z",
         maintainer_wallet: MAINTAINER_WALLET,
         royalty_bps: 500,
@@ -124,6 +127,8 @@ describe("响应 schemas", () => {
     const validResponse = {
       module: "us-msb",
       version: "2026.07.1",
+      engine_version: "1.0.0",
+      hash_scheme_version: "2",
       updated_at: "2026-07-24T00:00:00Z",
       maintainer_wallet: MAINTAINER_WALLET,
       royalty_bps: 500,
@@ -145,6 +150,20 @@ describe("响应 schemas", () => {
     expect(
       ModuleResponseSchema.safeParse({ ...validResponse, maintainer_wallet: "0x123" }).success,
     ).toBe(false);
+  });
+
+  it("区分 NOT_APPLICABLE，并要求每个 check 声明 basis", () => {
+    expect(
+      CheckResultSchema.safeParse({
+        ...validCheckResult,
+        result: "NOT_APPLICABLE",
+        basis: "not_applicable",
+      }).success,
+    ).toBe(true);
+
+    const resultWithoutBasis: Record<string, unknown> = { ...validCheckResult };
+    delete resultWithoutBasis.basis;
+    expect(CheckResultSchema.safeParse(resultWithoutBasis).success).toBe(false);
   });
 
   it("拒绝非 UTC 时间、非法版本和缺失 escalated_check_ids 的响应", () => {

@@ -5,6 +5,14 @@ import type { CheckResult, DealInput, Party } from "../schemas/index.js";
 const SEPARATOR = new Uint8Array([0x1f]);
 const TEXT_ENCODER = new TextEncoder();
 
+export const ENGINE_VERSION = "1.0.0";
+export const EVIDENCE_HASH_SCHEME_VERSION = "2";
+
+export interface EvidenceHashVersions {
+  engineVersion: string;
+  hashSchemeVersion: string;
+}
+
 function compareStrings(left: string, right: string): number {
   if (left < right) {
     return -1;
@@ -96,25 +104,36 @@ export function canonicalizeDealInput(input: DealInput): string {
 }
 
 /**
- * 仅保留影响判定的 check id 与 result，并按 id 排序后规范化。
+ * 仅保留影响判定的 check id、result 与 basis，并按 id 排序后规范化。
  */
 export function canonicalizeChecks(checks: readonly CheckResult[]): string {
   const materialChecks = checks
-    .map(({ id, result }) => ({ id, result }))
+    .map(({ id, result, basis }) => ({ id, result, basis }))
     .sort((left, right) => compareStrings(left.id, right.id));
 
   return canonicalizeJson(materialChecks);
 }
 
 /**
- * 使用规则文件原始字节、规范化输入和规范化 checks 计算 evidence_hash。
+ * 使用版本上下文、规则文件原始字节、规范化输入和规范化 checks 计算 evidence_hash。
  */
 export function computeEvidenceHash(
   rulesFileBytes: Uint8Array,
   input: DealInput,
   checks: readonly CheckResult[],
+  versions: EvidenceHashVersions = {
+    engineVersion: ENGINE_VERSION,
+    hashSchemeVersion: EVIDENCE_HASH_SCHEME_VERSION,
+  },
 ): string {
+  const versionContext = canonicalizeJson({
+    engine_version: versions.engineVersion,
+    hash_scheme_version: versions.hashSchemeVersion,
+  });
+
   return createHash("sha256")
+    .update(TEXT_ENCODER.encode(versionContext))
+    .update(SEPARATOR)
     .update(rulesFileBytes)
     .update(SEPARATOR)
     .update(TEXT_ENCODER.encode(canonicalizeDealInput(input)))

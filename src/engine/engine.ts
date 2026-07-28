@@ -1,5 +1,10 @@
-import { computeEvidenceHash } from "../evidence-hash/index.js";
+import {
+  computeEvidenceHash,
+  EVIDENCE_HASH_SCHEME_VERSION,
+  ENGINE_VERSION,
+} from "../evidence-hash/index.js";
 import type {
+  CheckBasis,
   CheckResult,
   CheckStatus,
   DealInput,
@@ -11,6 +16,8 @@ import type {
 export interface EngineResult {
   checks: CheckResult[];
   overall: CheckStatus;
+  engine_version: string;
+  hash_scheme_version: string;
   evidence_hash: string;
 }
 
@@ -60,10 +67,16 @@ function hasEvidence(value: unknown): boolean {
   return true;
 }
 
-function createCheck(rule: Rule, result: CheckStatus, reason: string): CheckResult {
+function createCheck(
+  rule: Rule,
+  result: CheckStatus,
+  basis: CheckBasis,
+  reason: string,
+): CheckResult {
   return {
     id: rule.id,
     result,
+    basis,
     reason,
     source: rule.source,
   };
@@ -71,20 +84,35 @@ function createCheck(rule: Rule, result: CheckStatus, reason: string): CheckResu
 
 function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
   if (rule.always_escalate) {
-    return createCheck(rule, "ESCALATE", `规则无法确定性判定，需人工核实：${rule.note}`);
+    return createCheck(
+      rule,
+      "ESCALATE",
+      "manual_review",
+      `规则无法确定性判定，需人工核实：${rule.note}`,
+    );
   }
 
   if (rule.when.amount_gte !== undefined && input.amount_usdc < rule.when.amount_gte) {
-    return createCheck(rule, "HOLD", "单笔未达门槛，聚合情形需采购方自行核实");
+    return createCheck(
+      rule,
+      "HOLD",
+      "insufficient_aggregate_data",
+      "单笔未达门槛，聚合情形需采购方自行核实",
+    );
   }
 
   if (rule.when.monthly_volume_gte !== undefined) {
     if (input.monthly_volume_usdc === undefined || input.monthly_volume_usdc === null) {
-      return createCheck(rule, "HOLD", "无法判定分级，需补交易量数据");
+      return createCheck(
+        rule,
+        "HOLD",
+        "insufficient_aggregate_data",
+        "无法判定分级，需补交易量数据",
+      );
     }
 
     if (input.monthly_volume_usdc < rule.when.monthly_volume_gte) {
-      return createCheck(rule, "PASS", "月交易量未达规则门槛");
+      return createCheck(rule, "NOT_APPLICABLE", "deterministic_threshold", "月交易量未达规则门槛");
     }
   }
 
@@ -93,28 +121,45 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
       !Object.hasOwn(input.evidence, evidenceKey) || !hasEvidence(input.evidence[evidenceKey]),
   );
 
-  return missingEvidence.length === 0
-    ? createCheck(rule, "PASS", "所需证据齐全")
-    : createCheck(rule, rule.result_if_missing, `缺少所需证据：${missingEvidence.join(", ")}`);
+  if (missingEvidence.length > 0) {
+    return createCheck(
+      rule,
+      rule.result_if_missing,
+      "missing_evidence",
+      `缺少所需证据：${missingEvidence.join(", ")}`,
+    );
+  }
+
+  return createCheck(
+    rule,
+    "PASS",
+    rule.required_evidence.length === 0 ? "deterministic_threshold" : "caller_assertion",
+    "所需证据齐全",
+  );
 }
 
 function evaluateRule(rule: Rule, input: DealInput): CheckResult {
   if (!matchesApplicability(input, rule.when)) {
-    return createCheck(rule, "PASS", "规则条件未触发");
+    return createCheck(rule, "NOT_APPLICABLE", "not_applicable", "规则条件未触发");
   }
 
   return evaluateApplicableRule(rule, input);
 }
 
 /**
- * 按 ESCALATE、HOLD、PASS 的优先级聚合最坏检查结果。
+ * 按 ESCALATE、HOLD、PASS 的优先级聚合最坏适用检查结果。
+ * NOT_APPLICABLE 为中性；如果全部检查均不适用，则整体也为 NOT_APPLICABLE。
  */
 export function aggregateCheckStatus(checks: readonly CheckResult[]): CheckStatus {
   if (checks.some(({ result }) => result === "ESCALATE")) {
     return "ESCALATE";
   }
 
-  return checks.some(({ result }) => result === "HOLD") ? "HOLD" : "PASS";
+  if (checks.some(({ result }) => result === "HOLD")) {
+    return "HOLD";
+  }
+
+  return checks.some(({ result }) => result === "PASS") ? "PASS" : "NOT_APPLICABLE";
 }
 
 /**
@@ -130,6 +175,8 @@ export function evaluate(
   return {
     checks,
     overall: aggregateCheckStatus(checks),
+    engine_version: ENGINE_VERSION,
+    hash_scheme_version: EVIDENCE_HASH_SCHEME_VERSION,
     evidence_hash: computeEvidenceHash(rulesFileBytes, input, checks),
   };
 }

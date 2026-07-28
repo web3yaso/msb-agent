@@ -1,3 +1,4 @@
+import { EVIDENCE_HASH_SCHEME_VERSION, ENGINE_VERSION } from "../evidence-hash/index.js";
 import type { PaymentConfig } from "../payment/index.js";
 import type { ModuleId } from "../schemas/index.js";
 import {
@@ -91,6 +92,8 @@ export function buildAgentCard(input: AgentCardInput): Record<string, unknown> {
       protocol: "x402",
       network: input.paymentConfig.network ?? "arc-testnet",
       chain_id: getChainId(input.paymentConfig),
+      engine_version: ENGINE_VERSION,
+      hash_scheme_version: EVIDENCE_HASH_SCHEME_VERSION,
       settlement_asset: "USDC",
       modules: moduleIds.map((moduleId) => ({
         id: moduleId,
@@ -103,7 +106,7 @@ export function buildAgentCard(input: AgentCardInput): Record<string, unknown> {
         sources: getSources(input.modules[moduleId]),
       })),
       evidence_hash_definition:
-        "sha256(rules_file_bytes || canonical_input || checks[{id,result}])",
+        "sha256(canonical_version_context || rules_file_bytes || canonical_input || checks[{id,result,basis}])",
       no_llm_in_decision_path: true,
       payment_parameters_are_not_covered_by_evidence_hash: true,
     },

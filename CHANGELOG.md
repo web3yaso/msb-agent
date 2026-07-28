@@ -5,6 +5,17 @@
 
 > 本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**。
 
+## [Unreleased]
+
+### 变更
+
+- 增加 `NOT_APPLICABLE`，不再用 `PASS` 表示规则未触发或已知数值低于适用门槛。
+- 为每个 check 增加机器可读 `basis`，区分调用方自述、缺失证据、确定性门槛、
+  聚合数据不足、人工复核与不适用。
+- Evidence hash 升级为 scheme `2`：将 `basis`、`engine_version` 与
+  `hash_scheme_version` 纳入预映射；旧 hash 值不再沿用。
+- 文档明确 `evidence_hash` 证明材料与结果未被修改，不证明调用方证据真实。
+
 ## [0.3.0] - 2026-07-26
 
 ### 新增
@@ -24,7 +35,7 @@
   README.md / README.zh-CN.md 中指向 `docs/api.md` 的交叉链接与锚点同步更新。
 - README.md / README.zh-CN.md 按"agent 开发者优先"重构：新首节"For AI Agents:
   Integrate in 3 Steps" / "AI Agent 接入三步"（发现/支付/验证 + `npm run
-  smoke:public` 一键体验），全文长度砍到约三分之一；被移除的长配置表、限流细节、
+smoke:public` 一键体验），全文长度砍到约三分之一；被移除的长配置表、限流细节、
   支付层详述、CI/测试说明迁移进 `docs/api.md`（新增「Background」「Module
   Overview」「Payment Modes and Pricing」小节）与 `docs/deploy.md`（新增「本地
   开发」「测试与 CI」「完整配置项参考表」「本地对 Arc Testnet 的真实链上冒烟」

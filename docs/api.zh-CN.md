@@ -20,7 +20,7 @@ zod 定义为准；本文示例均来自可通过 `npm test` 复现的实际请�
 ## 模块一览
 
 | 模块     | 法域                               | 受理条件                        |
-| -------- | ----------------------------------- | -------------------------------- |
+| -------- | ---------------------------------- | ------------------------------- |
 | `us-msb` | 美国（联邦 + 纽约州）              | 任一 party `country = "US"`     |
 | `uk-msb` | 英国                               | 任一 party `country = "GB"`     |
 | `eu-msb` | 欧盟（含德/法/荷成员国专项检查项） | 任一 party 落在 27 个欧盟成员国 |
@@ -35,16 +35,16 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 
 ## 端点一览
 
-| 方法 | 路径                                   | 收费       | 说明                                      |
-| ---- | -------------------------------------- | ---------- | ----------------------------------------- |
-| GET  | `/`                                     | 否         | 服务目录 JSON（名称、描述、端点映射、仓库地址） |
-| GET  | `/healthz`                             | 否         | 部署平台健康检查；唯一豁免限流的端点      |
-| GET  | `/static/agent-icon.png`               | 否         | agent card 图标图片                       |
-| GET  | `/modules`                             | 否         | 列出 4 个模块的定价、收款地址、法源、版本 |
-| GET  | `/modules/:id/schema`                  | 否         | 该模块 evidence 字段的 JSON Schema        |
-| GET  | `/.well-known/agent-card.json`         | 否         | ERC-8004 registration-v1 agent card       |
-| GET  | `/.well-known/agent-registration.json` | 否         | 已注册身份的域名控制证明；未注册时 404    |
-| POST | `/modules/:id/check`                   | 是（x402） | 提交交易信息，返回确定性检查结果          |
+| 方法 | 路径                                   | 收费       | 说明                                            |
+| ---- | -------------------------------------- | ---------- | ----------------------------------------------- |
+| GET  | `/`                                    | 否         | 服务目录 JSON（名称、描述、端点映射、仓库地址） |
+| GET  | `/healthz`                             | 否         | 部署平台健康检查；唯一豁免限流的端点            |
+| GET  | `/static/agent-icon.png`               | 否         | agent card 图标图片                             |
+| GET  | `/modules`                             | 否         | 列出 4 个模块的定价、收款地址、法源、版本       |
+| GET  | `/modules/:id/schema`                  | 否         | 该模块 evidence 字段的 JSON Schema              |
+| GET  | `/.well-known/agent-card.json`         | 否         | ERC-8004 registration-v1 agent card             |
+| GET  | `/.well-known/agent-registration.json` | 否         | 已注册身份的域名控制证明；未注册时 404          |
+| POST | `/modules/:id/check`                   | 是（x402） | 提交交易信息，返回确定性检查结果                |
 
 `:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`（`ModuleIdSchema`）。
 
@@ -226,27 +226,30 @@ Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
 
 ### 响应体（`ModuleResponseSchema`）
 
-| 字段                     | 类型                                                | 说明                                                                                                                            |
-| ------------------------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `module`                 | `ModuleId`                                          | 回显请求的模块                                                                                                                  |
-| `version`                | `string`，`^\d{4}\.\d{2}\.\d+$`                     | 规则文件版本（如 `2026.07.1`）                                                                                                  |
-| `updated_at`             | ISO8601 UTC（无偏移量后缀，`YYYY-MM-DDTHH:mm:ssZ`） | 规则文件最后修订时间                                                                                                            |
-| `maintainer_wallet`      | `string`，`^0x[0-9a-fA-F]{40}$`                     | Module 维护者版税收款地址；零地址表示实例未配置版税收款方，采购方必须视为“不支付版税”，不得向零地址转账                         |
-| `royalty_bps`            | `integer`，0–10000                                  | 版税基点（10000 = 100%），基数为本次调用采购价；该运营参数不被 `evidence_hash` 背书，采购方须按自身白名单与单笔上限校验后再支付 |
-| `checks`                 | `CheckResult[]`                                     | 见下                                                                                                                            |
-| `overall`                | `"PASS"` \| `"HOLD"` \| `"ESCALATE"`                | 聚合结果，见「聚合语义」                                                                                                        |
-| `settlement_constraints` | `SettlementConstraints`                             | 见下                                                                                                                            |
-| `evidence_hash`          | 64 位十六进制字符串                                 | 与 `settlement_constraints.evidence_hash` 相同                                                                                  |
-| `disclaimer`             | `string`                                            | 固定免责声明文案                                                                                                                |
+| 字段                     | 类型                                                       | 说明                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `module`                 | `ModuleId`                                                 | 回显请求的模块                                                                                                                  |
+| `version`                | `string`，`^\d{4}\.\d{2}\.\d+$`                            | 规则文件版本（如 `2026.07.1`）                                                                                                  |
+| `engine_version`         | 语义化版本字符串                                           | 确定性引擎语义版本，纳入 `evidence_hash`                                                                                        |
+| `hash_scheme_version`    | 数字字符串                                                 | Evidence hash 预映射方案版本，纳入 `evidence_hash`                                                                              |
+| `updated_at`             | ISO8601 UTC（无偏移量后缀，`YYYY-MM-DDTHH:mm:ssZ`）        | 规则文件最后修订时间                                                                                                            |
+| `maintainer_wallet`      | `string`，`^0x[0-9a-fA-F]{40}$`                            | Module 维护者版税收款地址；零地址表示实例未配置版税收款方，采购方必须视为“不支付版税”，不得向零地址转账                         |
+| `royalty_bps`            | `integer`，0–10000                                         | 版税基点（10000 = 100%），基数为本次调用采购价；该运营参数不被 `evidence_hash` 背书，采购方须按自身白名单与单笔上限校验后再支付 |
+| `checks`                 | `CheckResult[]`                                            | 见下                                                                                                                            |
+| `overall`                | `"PASS"` \| `"HOLD"` \| `"ESCALATE"` \| `"NOT_APPLICABLE"` | 聚合结果，见「聚合语义」                                                                                                        |
+| `settlement_constraints` | `SettlementConstraints`                                    | 见下                                                                                                                            |
+| `evidence_hash`          | 64 位十六进制字符串                                        | 与 `settlement_constraints.evidence_hash` 相同                                                                                  |
+| `disclaimer`             | `string`                                                   | 固定免责声明文案                                                                                                                |
 
 `CheckResult`：
 
-| 字段     | 说明                                                             |
-| -------- | ---------------------------------------------------------------- |
-| `id`     | 规则 id，如 `us-fincen-registration-money-transmission`          |
-| `result` | `PASS` \| `HOLD` \| `ESCALATE`                                   |
-| `reason` | 人类可读原因（不参与 `evidence_hash` 计算，措辞修正不改变 hash） |
-| `source` | 法源引用（对应规则文件 `source` 字段）                           |
+| 字段     | 说明                                                                                                                                                |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`     | 规则 id，如 `us-fincen-registration-money-transmission`                                                                                             |
+| `result` | `PASS` \| `HOLD` \| `ESCALATE` \| `NOT_APPLICABLE`                                                                                                  |
+| `basis`  | 机器可读依据：`not_applicable`、`caller_assertion`、`missing_evidence`、`deterministic_threshold`、`insufficient_aggregate_data` 或 `manual_review` |
+| `reason` | 人类可读原因（不参与 `evidence_hash` 计算，措辞修正不改变 hash）                                                                                    |
+| `source` | 法源引用（对应规则文件 `source` 字段）                                                                                                              |
 
 `SettlementConstraints`：
 
@@ -262,28 +265,35 @@ Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
 ### 聚合语义
 
 任一 check `ESCALATE` → `overall = ESCALATE`；否则任一 `HOLD` → `overall = HOLD`；
-否则 `overall = PASS`（`src/engine/engine.ts` 的 `aggregateCheckStatus`，
-`ESCALATE > HOLD > PASS` 优先级）。
+否则任一 `PASS` → `overall = PASS`。`NOT_APPLICABLE` 为中性；若所有检查均为
+`NOT_APPLICABLE`，overall 也返回 `NOT_APPLICABLE`（`src/engine/engine.ts` 的
+`aggregateCheckStatus`，`ESCALATE > HOLD > PASS > NOT_APPLICABLE` 优先级）。
 
 ### `evidence_hash` 与 `settlement_constraints`
 
 ```
-evidence_hash = sha256( rules_file_bytes || 0x1F || canon(input) || 0x1F || canon(checks) )
+evidence_hash = sha256( canon(version_context) || 0x1F || rules_file_bytes || 0x1F || canon(input) || 0x1F || canon(checks) )
 ```
 
+- `canon(version_context)`：`{engine_version, hash_scheme_version}`，按下述相同 JSON
+  规则规范化；
 - `rules_file_bytes`：该模块规则文件的原始 UTF-8 字节（不做 JSON 规范化——文件本身
   是版本化产物，字节即身份）；
 - `canon(input)`：`{deal_id, parties, activity, amount_usdc, monthly_volume_usdc?,
 evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符串 NFC）；
   `parties` 先按 `(role, country, state)` 排序，数组书写顺序不影响 hash；
   `monthly_volume_usdc` 为 `undefined` 时整个字段省略（不是写入 `null`）；
-- `canon(checks)`：仅 `{id, result}` 数组，按 `id` 排序后规范化——**不含
-  `reason`**，修正措辞不改变 hash，只有 `result` 变化才是实质变更；
-- `0x1F`（Unit Separator）分隔三段，各段自身合法 JSON/UTF-8，消除拼接歧义。
+- `canon(checks)`：仅 `{id, result, basis}` 数组，按 `id` 排序后规范化——**不含
+  `reason`**，修正措辞不改变 hash，`result` 或 `basis` 变化才是实质变更；
+- `0x1F`（Unit Separator）分隔四段，各段自身合法 JSON/UTF-8，消除拼接歧义。
 
 该算法是公开规范，采购方或第三方审计者可用相同规则文件、相同请求体、相同 checks
 离线重放验证 `evidence_hash`（实现见 `src/evidence-hash/evidence-hash.ts`，golden
 测试对已知输入的具体 hash 值断言，见 `src/golden/citely-demo.test.ts`）。
+
+该 hash 证明版本上下文、规则字节、请求输入和实质检查结果未被修改，**不证明**
+调用方提交的材料真实，也不表示外部登记库已经核验。非空调用方材料形成的 `PASS`
+因此使用 `basis: "caller_assertion"`。
 
 ### 示例：完整证据 → `PASS`
 
@@ -305,6 +315,8 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
 {
   "module": "us-msb",
   "version": "2026.07.1",
+  "engine_version": "1.0.0",
+  "hash_scheme_version": "2",
   "updated_at": "2026-07-24T00:00:00Z",
   "maintainer_wallet": "0x1111111111111111111111111111111111111111",
   "royalty_bps": 500,
@@ -312,36 +324,42 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
     {
       "id": "us-fincen-registration-money-transmission",
       "result": "HOLD",
+      "basis": "missing_evidence",
       "reason": "缺少所需证据：fincen_msb_registration",
       "source": "31 CFR § 1022.380"
     },
     {
       "id": "us-fincen-registration-threshold-activities",
-      "result": "PASS",
+      "result": "NOT_APPLICABLE",
+      "basis": "not_applicable",
       "reason": "规则条件未触发",
       "source": "31 CFR § 1010.100(ff)"
     },
     {
       "id": "us-bsa-aml-program",
       "result": "HOLD",
+      "basis": "missing_evidence",
       "reason": "缺少所需证据：bsa_aml_program",
       "source": "31 CFR § 1022.210"
     },
     {
       "id": "us-sar-controls",
       "result": "HOLD",
+      "basis": "missing_evidence",
       "reason": "缺少所需证据：sar_monitoring_and_filing_controls",
       "source": "31 CFR § 1022.320"
     },
     {
       "id": "us-ny-money-transmitter-license",
       "result": "HOLD",
+      "basis": "missing_evidence",
       "reason": "缺少所需证据：ny_money_transmitter_license",
       "source": "NY Banking Law Article 13-B"
     },
     {
       "id": "us-ny-bitlicense",
-      "result": "PASS",
+      "result": "NOT_APPLICABLE",
+      "basis": "not_applicable",
       "reason": "规则条件未触发",
       "source": "23 NYCRR Part 200"
     }
@@ -359,9 +377,9 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
       "us-ny-money-transmitter-license"
     ],
     "escalated_check_ids": [],
-    "evidence_hash": "fbf59533a95ef45bf3067772d45778f7c875aa0240a07b7a6376925b857cc12d"
+    "evidence_hash": "44bf07506c3ba782b93d8208757737aee4894c0227a47865ca1d34e7b2aa45e4"
   },
-  "evidence_hash": "fbf59533a95ef45bf3067772d45778f7c875aa0240a07b7a6376925b857cc12d",
+  "evidence_hash": "44bf07506c3ba782b93d8208757737aee4894c0227a47865ca1d34e7b2aa45e4",
   "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。"
 }
 ```
@@ -395,7 +413,8 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
   `PASS`**；
 - `monthly_volume_gte` 依赖可选字段 `monthly_volume_usdc`：缺失（`undefined` 或
   `null`）→ 相关检查项 `HOLD`，`reason: "无法判定分级，需补交易量数据"`；达到该字段
-  但低于门槛 → `PASS`，`reason: "月交易量未达规则门槛"`；
+  但低于门槛 → `NOT_APPLICABLE`，`basis: "deterministic_threshold"`，
+  `reason: "月交易量未达规则门槛"`；
 - 币种统一假设 USDC ≈ USD；非美元法源门槛（如新加坡 SGD）在规则文件里写死换算后的
   USDC 门槛值，`note` 字段标注换算汇率与换算日期，引擎内部不做隐式汇率换算。
 

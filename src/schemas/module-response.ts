@@ -1,9 +1,12 @@
 import { z } from "zod";
 
 import {
+  CheckBasisSchema,
   CheckStatusSchema,
+  EngineVersionSchema,
   EvmAddressSchema,
   EvidenceHashSchema,
+  EvidenceHashSchemeVersionSchema,
   ModuleIdSchema,
   ModuleVersionSchema,
   RoyaltyBpsSchema,
@@ -13,6 +16,7 @@ import {
 export const CheckResultSchema = z.strictObject({
   id: z.string().min(1),
   result: CheckStatusSchema,
+  basis: CheckBasisSchema,
   reason: z.string().min(1),
   source: z.string().min(1),
 });
@@ -30,6 +34,8 @@ export const SettlementConstraintsSchema = z.strictObject({
 export const ModuleResponseSchema = z.strictObject({
   module: ModuleIdSchema,
   version: ModuleVersionSchema,
+  engine_version: EngineVersionSchema,
+  hash_scheme_version: EvidenceHashSchemeVersionSchema,
   updated_at: UtcDateTimeSchema,
   maintainer_wallet: EvmAddressSchema,
   royalty_bps: RoyaltyBpsSchema,

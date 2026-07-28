@@ -27,10 +27,10 @@ const CITELY_DEMO_INPUT = {
 };
 
 const EXPECTED_EVIDENCE_HASHES: Record<ModuleId, string> = {
-  "us-msb": "fbf59533a95ef45bf3067772d45778f7c875aa0240a07b7a6376925b857cc12d",
-  "uk-msb": "1d71297d3a4085997f5dc93aad106cc356bf1541eea803bbf2ce6965210b5252",
-  "eu-msb": "33c65cb7cb4fb614d28ea99ecdc73e4254628c8a6cab1fe146231a1f7ccce271",
-  "sg-msb": "f337f7ad5e547092ecf29f87e2678653a972443bc8f16731bba7130ad046e2f8",
+  "us-msb": "44bf07506c3ba782b93d8208757737aee4894c0227a47865ca1d34e7b2aa45e4",
+  "uk-msb": "8358d3e2e9abd808a8e117b3f62849bebaa9ec4632c2209aa52d2702bf249e2d",
+  "eu-msb": "1830888a785947fa2910d1818838ca2f83599b5278bdb49b80b1e512bda63d3e",
+  "sg-msb": "0e58bb4cb990e6321963bfb09a8404f54cd0f5f3ab0a13e2264a79ecdae61d00",
 };
 
 describe("Citely Demo golden responses", () => {
@@ -67,6 +67,8 @@ describe("Citely Demo golden responses", () => {
   it.each(ModuleIdSchema.options)("%s 的 evidence_hash 跨运行固定", (moduleId) => {
     const response = responses[moduleId];
 
+    expect(response.engine_version).toBe("1.0.0");
+    expect(response.hash_scheme_version).toBe("2");
     expect(response.evidence_hash).toBe(EXPECTED_EVIDENCE_HASHES[moduleId]);
     expect(response.settlement_constraints.evidence_hash).toBe(EXPECTED_EVIDENCE_HASHES[moduleId]);
   });

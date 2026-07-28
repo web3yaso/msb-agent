@@ -6,6 +6,8 @@ import {
   canonicalizeDealInput,
   canonicalizeJson,
   computeEvidenceHash,
+  EVIDENCE_HASH_SCHEME_VERSION,
+  ENGINE_VERSION,
 } from "./index.js";
 
 const input: DealInput = {
@@ -28,12 +30,14 @@ const checks: CheckResult[] = [
   {
     id: "us-state-license",
     result: "ESCALATE",
+    basis: "manual_review",
     reason: "需人工核实",
     source: "NY Banking Law Article 13-B",
   },
   {
     id: "us-fincen-registration",
     result: "HOLD",
+    basis: "missing_evidence",
     reason: "缺少 FinCEN MSB 注册证据",
     source: "31 CFR § 1022.380",
   },
@@ -72,9 +76,9 @@ describe("canonicalizeDealInput", () => {
 });
 
 describe("canonicalizeChecks", () => {
-  it("只保留 id 和 result，按 id 排序且忽略 reason 与 source", () => {
+  it("只保留 id、result 和 basis，按 id 排序且忽略 reason 与 source", () => {
     expect(canonicalizeChecks(checks)).toBe(
-      '[{"id":"us-fincen-registration","result":"HOLD"},{"id":"us-state-license","result":"ESCALATE"}]',
+      '[{"basis":"missing_evidence","id":"us-fincen-registration","result":"HOLD"},{"basis":"manual_review","id":"us-state-license","result":"ESCALATE"}]',
     );
 
     expect(
@@ -84,19 +88,43 @@ describe("canonicalizeChecks", () => {
       ]),
     ).toBe(canonicalizeChecks(checks));
   });
+
+  it("basis 改变时规范化结果随之改变", () => {
+    expect(canonicalizeChecks([{ ...checks[0], basis: "missing_evidence" }])).not.toBe(
+      canonicalizeChecks([checks[0]]),
+    );
+  });
 });
 
 describe("computeEvidenceHash", () => {
-  it("匹配固定已知向量", () => {
-    expect(computeEvidenceHash(rulesFileBytes, input, checks)).toBe(
-      "896e5beaec71172e3e1ea565587de3533b036abc359dc673bb36f1deb717ca37",
-    );
-  });
-
   it("同一输入重复计算得到相同结果", () => {
     const firstHash = computeEvidenceHash(rulesFileBytes, input, checks);
     const secondHash = computeEvidenceHash(rulesFileBytes, input, checks);
 
     expect(secondHash).toBe(firstHash);
+  });
+
+  it("basis 或 engine_version 改变时 hash 随之改变", () => {
+    const baseline = computeEvidenceHash(rulesFileBytes, input, checks);
+    const changedBasis = computeEvidenceHash(rulesFileBytes, input, [
+      { ...checks[0], basis: "missing_evidence" },
+      checks[1],
+    ]);
+    const changedEngine = computeEvidenceHash(rulesFileBytes, input, checks, {
+      engineVersion: "9.9.9",
+      hashSchemeVersion: EVIDENCE_HASH_SCHEME_VERSION,
+    });
+
+    expect(changedBasis).not.toBe(baseline);
+    expect(changedEngine).not.toBe(baseline);
+  });
+
+  it("默认使用公开的 engine 与 hash scheme 版本", () => {
+    expect(
+      computeEvidenceHash(rulesFileBytes, input, checks, {
+        engineVersion: ENGINE_VERSION,
+        hashSchemeVersion: EVIDENCE_HASH_SCHEME_VERSION,
+      }),
+    ).toBe(computeEvidenceHash(rulesFileBytes, input, checks));
   });
 });

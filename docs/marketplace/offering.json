@@ -58,7 +58,7 @@
     "deterministic": true,
     "llm_in_decision_path": false,
     "every_rule_cites_source": true,
-    "verifiability": "evidence_hash = sha256(rules_file_bytes || canonical_input || checks[{id,result}])",
+    "verifiability": "evidence_hash = sha256(canonical_version_context || rules_file_bytes || canonical_input || checks[{id,result,basis}])",
     "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。"
   }
 }

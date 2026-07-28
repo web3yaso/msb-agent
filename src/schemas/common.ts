@@ -14,7 +14,20 @@ export const ActivitySchema = z.enum([
   "check_cashing",
 ]);
 
-export const CheckStatusSchema = z.enum(["PASS", "HOLD", "ESCALATE"]);
+export const CheckStatusSchema = z.enum(["PASS", "HOLD", "ESCALATE", "NOT_APPLICABLE"]);
+
+export const CheckBasisSchema = z.enum([
+  "not_applicable",
+  "caller_assertion",
+  "missing_evidence",
+  "deterministic_threshold",
+  "insufficient_aggregate_data",
+  "manual_review",
+]);
+
+export const EngineVersionSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
+
+export const EvidenceHashSchemeVersionSchema = z.string().regex(/^\d+$/);
 
 export const ModuleIdSchema = z.enum(["us-msb", "uk-msb", "eu-msb", "sg-msb"]);
 
@@ -29,6 +42,7 @@ export const ModuleVersionSchema = z.string().regex(/^\d{4}\.\d{2}\.\d+$/);
 export const EvidenceHashSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
 export type Activity = z.infer<typeof ActivitySchema>;
+export type CheckBasis = z.infer<typeof CheckBasisSchema>;
 export type CheckStatus = z.infer<typeof CheckStatusSchema>;
 export type ModuleId = z.infer<typeof ModuleIdSchema>;
 export type PartyRole = z.infer<typeof PartyRoleSchema>;

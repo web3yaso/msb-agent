@@ -77,18 +77,33 @@ A successful `200` response has this shape (not a literal example — see
 ```json
 {
   "module": "us-msb",
-  "checks": [{ "id": "...", "result": "PASS | HOLD | ESCALATE", "reason": "...", "source": "..." }],
-  "overall": "PASS | HOLD | ESCALATE",
-  "settlement_constraints": { "blocked_check_ids": [], "escalated_check_ids": [], "evidence_hash": "..." },
+  "engine_version": "1.0.0",
+  "hash_scheme_version": "2",
+  "checks": [
+    {
+      "id": "...",
+      "result": "PASS | HOLD | ESCALATE | NOT_APPLICABLE",
+      "basis": "...",
+      "reason": "...",
+      "source": "..."
+    }
+  ],
+  "overall": "PASS | HOLD | ESCALATE | NOT_APPLICABLE",
+  "settlement_constraints": {
+    "blocked_check_ids": [],
+    "escalated_check_ids": [],
+    "evidence_hash": "..."
+  },
   "evidence_hash": "...",
   "disclaimer": "..."
 }
 ```
 
-`evidence_hash` is a sha256 over the rule file bytes, the canonicalized input,
-and the canonicalized checks — anyone can replay it offline with the same
-public rule files to independently verify the result. Full field-by-field
-reference: **[docs/api.md](docs/api.md)**.
+`evidence_hash` is a sha256 over the version context, rule file bytes,
+canonicalized input, and canonicalized checks — anyone can replay it offline
+with the same public rule files to verify that those artifacts and the result
+were not modified. It does not prove that caller-supplied evidence is true.
+Full field-by-field reference: **[docs/api.md](docs/api.md)**.
 
 ### Try It Now
 

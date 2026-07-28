@@ -106,7 +106,8 @@ describe("sg-msb 规则文件", () => {
     const result = evaluate(rulesFile.rules, createInput(testCase, "US"), rulesFileBytes);
 
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
-      result: "PASS",
+      result: "NOT_APPLICABLE",
+      basis: "not_applicable",
       reason: "规则条件未触发",
     });
   });

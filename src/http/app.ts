@@ -406,6 +406,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
     const response = ModuleResponseSchema.parse({
       module: selectedModule.id,
       version: selectedModule.module.metadata.version,
+      engine_version: engineResult.engine_version,
+      hash_scheme_version: engineResult.hash_scheme_version,
       updated_at: selectedModule.module.metadata.updated_at,
       maintainer_wallet: royaltyConfig[selectedModule.id].maintainerWallet,
       royalty_bps: royaltyConfig[selectedModule.id].royaltyBps,
