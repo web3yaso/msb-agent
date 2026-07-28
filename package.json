@@ -15,6 +15,7 @@
     "validate:rules": "node --import tsx scripts/validate-rules.ts",
     "check:links": "node --import tsx scripts/check-rule-links.ts",
     "smoke:arc": "node --import tsx scripts/smoke-arc.ts",
+    "smoke:public": "node --import tsx scripts/smoke-public.ts",
     "register:8004": "node --import tsx scripts/register-8004.ts",
     "verify:8004": "node --import tsx scripts/verify-8004.ts"
   },

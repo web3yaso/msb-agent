@@ -2,34 +2,34 @@
 
 [English](README.md) | 简体中文
 
-为 **Citely Global Agent Deal Desk（cleardesk）** 提供跨境汇款监管合规检查的按次付费
-API。服务是一个确定性规则引擎：4 个法域模块（美国 / 英国 / 欧盟 / 新加坡）依据规则
-文件对交易输入做机械求值，输出 `PASS` / `HOLD` / `ESCALATE` 三态检查项状态，通过
-[x402](https://www.x402.org/) 协议在 Circle Arc Testnet 上以测试网 USDC 收费结算。
-
-本项目是 Circle / Arc 黑客松方案（Citely Deal Desk v2.2）中的 4 个 Compliance
-Module（方案流程图 F1–F3）参考实现。
+一个确定性、按次付费的 API：对跨境汇款活动核对四个法域（美国 / 英国 / 欧盟 /
+新加坡）的 MSB 监管要求，通过 [x402](https://www.x402.org/) 协议在 Circle Arc
+Testnet 上以测试网 USDC 按次计费。
 
 > **免责声明**：本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**，
 > 也不代表"合规"或"合法"结论。判定回路中不含 LLM——每个 check 结果都由规则引擎
-> 从可审计的规则文件确定性推导，可用 `evidence_hash` 离线重放验证（见下文）。
+> 从可审计的规则文件确定性推导，可用 `evidence_hash` 离线重放验证。
 
-## 线上服务
+## AI Agent 接入三步
 
-服务已部署，公网地址：
+线上实例：**<https://msb-agent-production-769d.up.railway.app>**
 
-**<https://msb-agent-production-769d.up.railway.app>**
-
-以下三条命令可直接复制运行，前两条无需任何配置或支付：
+### 1. 发现
 
 ```bash
-# 1. 健康检查（始终免费，豁免限流）
-curl https://msb-agent-production-769d.up.railway.app/healthz
-
-# 2. 免费发现端点：模块列表、定价、收款地址、法源
 curl https://msb-agent-production-769d.up.railway.app/modules
+```
 
-# 3. 不带支付凭证调用付费端点 → 返回 HTTP 402
+返回四个模块（`us-msb`、`uk-msb`、`eu-msb`、`sg-msb`）的定价、收款地址、法源与
+`input_schema_url`。也可以通过 [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) 身份发现本服务：`GET
+/.well-known/agent-card.json` 已在 Arc Testnet 的 Identity Registry 注册为
+Agent ID `851930`。
+
+### 2. 支付
+
+不带支付凭证调用付费端点会返回 `402`：
+
+```bash
 curl -i -X POST https://msb-agent-production-769d.up.railway.app/modules/us-msb/check \
   -H 'content-type: application/json' \
   -d '{
@@ -45,309 +45,114 @@ curl -i -X POST https://msb-agent-production-769d.up.railway.app/modules/us-msb/
   }'
 ```
 
-第三条命令会返回 `HTTP/2 402`，响应体是空 JSON（`{}`）；真正的 x402 报价单按协议
-编码在 `payment-required` 响应头里（base64），不在响应体中。要完成真实支付并拿到
-`200` 的确定性检查结果，需要使用支持 x402 协议的客户端——参见本仓库的
-`npm run smoke:arc`，或将任何 x402 钱包/客户端指向上述地址并配置
-`PAYMENT_MODE=x402-arc-testnet`。
+`402` 响应体是空 JSON（`{}`）；真正的报价单按 x402 协议 base64 编码在
+`payment-required` 响应头里（`scheme: "exact"`、`network: "eip155:5042002"`，
+结算走 Circle Gateway 的 `GatewayWalletBatched`）。任何支持 x402 协议的客户端都
+能完成支付。用 `@circle-fin/x402-batching` 的一个最小示例（钱包的 USDC 需要已经
+存入 Circle Gateway 余额）：
 
-## 目录
+```ts
+import { GatewayClient } from "@circle-fin/x402-batching/client";
 
-- [线上服务](#线上服务)
-- [项目定位](#项目定位)
-- [黑客松架构位置（Citely Deal Desk v2.2）](#黑客松架构位置citely-deal-desk-v22)
-- [快速开始](#快速开始)
-- [架构要点](#架构要点)
-- [API 概览](#api-概览)
-- [支付层（x402）](#支付层x402)
-- [CI 校验](#ci-校验)
-- [测试](#测试)
-- [配置项一览](#配置项一览)
-- [公网部署与链上身份](#公网部署与链上身份)
-
-## 项目定位
-
-| 模块     | 法域                               | 受理条件                        |
-| -------- | ---------------------------------- | ------------------------------- |
-| `us-msb` | 美国（联邦 + 纽约州）              | 任一 party `country = "US"`     |
-| `uk-msb` | 英国                               | 任一 party `country = "GB"`     |
-| `eu-msb` | 欧盟（含德/法/荷成员国专项检查项） | 任一 party 落在 27 个欧盟成员国 |
-| `sg-msb` | 新加坡                             | 任一 party `country = "SG"`     |
-
-**不做**：规则自动更新、多语言输出、KYB/钱包数据采购（属 Citely F4，另一供应商）、
-Jurisdiction Review（属 Citely F5）、真实法律意见。
-
-## 黑客松架构位置（Citely Deal Desk v2.2）
-
-四层架构从上到下为：L4 客户执行层 → L3 Arc Testnet 协议与支付层 → L2 判定服务层
-（案件引擎，主仓库）→ **L1 知识与供给层（本仓库 = module-server）**。L2 通过
-HTTP + x402 付费调用本仓库；本仓库对 L2 是已部署的第三方 Module 供应商，保持独立
-部署，不并入主仓库 monorepo。
-
-| 仓库               | 职责                                                                | 关系                                 |
-| ------------------ | ------------------------------------------------------------------- | ------------------------------------ |
-| `citely-deal-desk` | L2/L3/L4 + rubrics，主仓库（**TODO：GitHub 链接待主仓库公开后补**） | 主仓库 README 将回链本仓库，形成互链 |
-| `msb-agent`        | L1 module-server，本仓库，独立部署                                  | 为主仓库提供付费 Module API          |
-
-L2 调用 `POST /modules/:id/check`，付费成功后从 200 响应取得 `evidence_hash`（写入
-SA 的 `modules_used`），以及 `maintainer_wallet` / `royalty_bps`（用于版税微支付与
-账本 `category=royalty`）。本仓库只输出检查项状态；PASS/HOLD/ESCALATE 的结算编排
-与 SA 生成均在 L2。本仓库不含 LLM，也不产出法律意见。
-
-> **版税参数警示**（详见 [docs/api.zh-CN.md](docs/api.zh-CN.md)）：`maintainer_wallet` 为
-> `0x000…000` 零地址表示本实例未配置版税收款方，采购方必须视为"不支付版税"，
-> **不得向零地址转账**；`royalty_bps` 是运营参数，**不被 `evidence_hash` 背书**，
-> 采购方须按自身白名单与单笔上限校验后再支付版税。
-
-## 快速开始
-
-要求：Node.js 20+（开发环境用 Node 22/25 验证过）、npm。
-
-```bash
-npm install
-cp .env.example .env
+const gatewayClient = new GatewayClient({ chain: "arcTestnet", privateKey });
+const response = await gatewayClient.pay(
+  "https://msb-agent-production-769d.up.railway.app/modules/us-msb/check",
+  { method: "POST", headers: { "content-type": "application/json" }, body: dealInput },
+);
+// response.status === 200；response.transaction 是结算 ID；response.data 是检查结果
 ```
 
-`.env.example` 默认给出 `PAYMENT_MODE=off`（本地无支付启动，注意：这只是示例文件里
-的显式值，源码默认值是 `x402-arc-testnet`，见下文「支付层」）。以 off 模式启动：
+### 3. 验证
 
-```bash
-npm run dev        # tsx watch，监听 PORT（默认 3000）
-npm test            # vitest run，含引擎/HTTP/golden/支付层测试
-npx tsc --noEmit    # 类型检查
-```
-
-启动后可直接试探发现端点：
-
-```bash
-curl http://localhost:3000/modules
-curl http://localhost:3000/modules/us-msb/schema
-```
-
-`off` 模式下 `POST /modules/:id/check` 不收费，可直接联调业务逻辑；`x402-*` 模式下
-同一端点会先返回 HTTP 402（见下文）。
-
-## 架构要点
-
-- **判定回路无 LLM**：`POST /modules/:id/check` 的 `checks` 只能由
-  `src/engine/engine.ts` 的纯函数 `evaluate(rules, input, rulesFileBytes)` 从
-  `src/rules/*.json` 规则文件确定性推导；规则表达不了的情形一律输出 `ESCALATE`，
-  不允许静默跳过（例如加密资产穿透具体监管边界时）。
-- **规则文件即法源**：每个模块一个规则文件（`src/rules/us-msb.json` /
-  `uk-msb.json` / `eu-msb.json` / `sg-msb.json`），每条规则必须带 `source` /
-  `source_url` / `accessed_date`；变更规则必须同步 bump `version`
-  （`YYYY.MM.N`）和 `updated_at`——CI（`npm run validate:rules`）会挡掉遗漏。
-- **`evidence_hash` 可重放验证**：
-
-  ```
-  evidence_hash = sha256( rules_file_bytes || 0x1F || canon(input) || 0x1F || canon(checks) )
-  ```
-
-  `canon()` 是 RFC 8785（JCS）风格的规范化 JSON（键按字典序排序、无空白、字符串
-  NFC）；`parties` 数组按 `(role, country, state)` 排序后再规范化，数组书写顺序不
-  影响 hash；`canon(checks)` 只保留 `{id, result}`（不含 `reason` 文案，修正措辞不
-  改变 hash）。规则文件字节本身不做 JSON 规范化——文件是版本化产物，字节即身份。
-  算法实现见 `src/evidence-hash/evidence-hash.ts`，字段级语义见
-  [docs/api.zh-CN.md](docs/api.zh-CN.md#evidence_hash-与-settlement_constraints)。
-
-- **门槛类规则是单笔安全下界**：法源门槛多为聚合口径（如美国货币兑换
-  $1,000/人/日累计、新加坡 SPI/MPI 月均交易量分级）；引擎只看单笔/月交易量输入，
-  语义是"单笔 ≥ 门槛 ⇒ 聚合必然 ≥ 门槛"的保守触发方向，单笔未达门槛时**不输出
-  PASS**（只能输出 HOLD，说明聚合情形需采购方自行核实）。详见
-  [docs/api.zh-CN.md](docs/api.zh-CN.md)。
-- **法域受理边界**：只要请求中**任一** party 落在模块法域内即受理（模块外因素以
-  `ESCALATE` 检查项表达）；**全部** party 都在法域外才返回 422——这条边界是有意
-  设计的，防止用 422 绕过"规则表达不了就 ESCALATE"的不变量。
-
-## API 概览
-
-六个端点，详细字段/错误码见 **[docs/api.zh-CN.md](docs/api.zh-CN.md)**：
-
-```
-GET  /healthz                              免费。部署平台健康检查；唯一豁免限流的端点。
-GET  /modules                              免费。列出 4 个模块的定价、收款地址、法源、版本。
-GET  /modules/:id/schema                   免费。该模块 evidence 字段的 JSON Schema（由 zod 导出）。
-GET  /.well-known/agent-card.json          免费。ERC-8004 registration-v1 agent card。
-GET  /.well-known/agent-registration.json  免费。已注册身份的域名控制证明；未注册时 404。
-POST /modules/:id/check                    付费（x402）。提交交易信息，返回确定性检查结果。
-```
-
-全部免费发现路径，以及 `POST /modules/:id/check` 支付前的校验路径，均按客户端 IP
-固定窗口限流（默认每分钟 60 次，超限返回 429）。`GET /healthz` 是唯一豁免限流的
-端点，因为它是部署平台用于探活的地址。
-
-`POST /modules/:id/check` 示例（`us-msb`，`PAYMENT_MODE=off`）：
-
-```bash
-curl -X POST http://localhost:3000/modules/us-msb/check \
-  -H 'content-type: application/json' \
-  -d '{
-    "deal_id": "job-123",
-    "parties": [
-      { "role": "payer", "country": "US", "state": "NY" },
-      { "role": "payee", "country": "SG" }
-    ],
-    "activity": "money_transmission",
-    "amount_usdc": 10000,
-    "monthly_volume_usdc": null,
-    "evidence": {}
-  }'
-```
-
-响应节选（未提交任何证据，`overall` 为 `HOLD`；完整字段见 docs/api.zh-CN.md）：
+`200` 响应的大致形状如下（不是逐字示例——真实可复现的请求/响应见
+[docs/api.zh-CN.md](docs/api.zh-CN.md)）：
 
 ```json
 {
   "module": "us-msb",
-  "version": "2026.07.1",
-  "checks": [
-    {
-      "id": "us-fincen-registration-money-transmission",
-      "result": "HOLD",
-      "reason": "缺少所需证据：fincen_msb_registration",
-      "source": "31 CFR § 1022.380"
-    }
-  ],
-  "overall": "HOLD",
-  "settlement_constraints": {
-    "blocked_check_ids": ["us-fincen-registration-money-transmission", "..."],
-    "...": "..."
-  },
-  "evidence_hash": "fbf59533a95ef45bf3067772d45778f7c875aa0240a07b7a6376925b857cc12d",
-  "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。"
+  "checks": [{ "id": "...", "result": "PASS | HOLD | ESCALATE", "reason": "...", "source": "..." }],
+  "overall": "PASS | HOLD | ESCALATE",
+  "settlement_constraints": { "blocked_check_ids": [], "escalated_check_ids": [], "evidence_hash": "..." },
+  "evidence_hash": "...",
+  "disclaimer": "..."
 }
 ```
 
-## 支付层（x402）
+`evidence_hash` 是对规则文件字节、规范化输入、规范化 checks 三段的 sha256——任何
+人都可以用相同的公开规则文件离线重放验证结果。逐字段完整参考见
+**[docs/api.zh-CN.md](docs/api.zh-CN.md)**。
 
-三档 `PAYMENT_MODE`，**源码默认值为 `x402-arc-testnet`**（默认不允许是 `off`，这是
-一条架构红线）：
-
-| 模式                | 用途                                          | 网络                          |
-| ------------------- | --------------------------------------------- | ----------------------------- |
-| `off`               | 本地开发 / 单元测试；必须显式设置才生效       | 不发起支付                    |
-| `x402-base-sepolia` | 兜底：Arc facilitator 不稳定时的降级演示      | Base Sepolia，`eip155:84532`  |
-| `x402-arc-testnet`  | **主目标**：Circle hosted testnet facilitator | Arc Testnet，`eip155:5042002` |
-
-四模块差异化默认定价如下，可用对应 `{MODULE}_PRICE_USDC` 环境变量覆盖：
-
-| 模块     | 每次调用价格（测试网 USDC） |
-| -------- | --------------------------: |
-| `us-msb` |                  `0.800000` |
-| `eu-msb` |                  `0.600000` |
-| `uk-msb` |                  `0.400000` |
-| `sg-msb` |                  `0.200000` |
-
-价格合法范围为 `0 < price <= 100`，启动时校验并规范化为六位小数；非法值直接拒绝
-启动，防止小数点错位导致计费事故。
-收款地址通过 `US_MSB_PAY_TO` 等四个环境变量配置——收款地址是公开信息会出现在
-`GET /modules` 响应里，但绝不写入代码或文档，只走环境变量。
-
-请求处理顺序：**先 zod 校验（失败 400，不进付费流程）→ x402 中间件收费 → 规则引擎
-求值**，避免无效请求被误收费。
-
-Arc Testnet 走 Circle Gateway 的 `GatewayWalletBatched` 支付方案（`@x402/hono` +
-`@circle-fin/x402-batching`）。跑通真实链上流程的顺序：
-
-1. 到 [faucet.circle.com](https://faucet.circle.com/) 领取 Arc Testnet 测试网 USDC；
-2. 用 `GatewayClient.deposit(...)` 把测试网 USDC 存入 Circle Gateway（`smoke-arc.ts`
-   在余额不足时会自动执行这一步）；
-3. 客户端调用 `POST /modules/:id/check` → 收到 402 → `GatewayClient.pay(...)` 签名
-   支付 → 服务端验证/结算 → 返回 200 + 检查结果。
-
-本仓库已跑通一次真实冒烟（非占位数据）：Gateway 存款交易
-`0xfcc78968b336ac103fe577cfd74075309cf70720eb086a7394c28146d83919f7`，支付结算 ID
-`49f19918-632c-4ffe-9869-27be6472ac69`。复现命令：
+### 立即体验
 
 ```bash
-PAYMENT_MODE=x402-arc-testnet \
-MODULE_MAINTAINER_WALLET=<维护者钱包地址> \
-X402_SMOKE_CLIENT_PRIVATE_KEY=<测试钱包私钥，占位符，不要提交到仓库> \
-npm run smoke:arc
+git clone https://github.com/web3yaso/msb-agent.git && cd msb-agent && npm ci
 ```
 
-`x402-arc-testnet` 模式要求 `MODULE_MAINTAINER_WALLET` 已设置，否则服务会在启动时
-fail-fast；`npm run smoke:arc` 同样受此校验约束。
+创建 `.env.local` 并写入两行——可以用编辑器手动创建，也可以用 `read -rs`：这样
+私钥不会出现在命令行里，且不会覆盖该文件里可能已有的其它私钥：
 
-冒烟脚本相关环境变量（`X402_SMOKE_CLIENT_PRIVATE_KEY` / `SMOKE_ARC_RPC_URL` /
-`SMOKE_MODULE` / `SMOKE_PORT` / `SMOKE_DEPOSIT_USDC`）说明见脚本本身
-`scripts/smoke-arc.ts` 及下方「配置项一览」；`.env.example` 中若尚未列出该系列变量，
-以脚本内定义为准（脚本对每个变量都有格式校验与报错提示）。
-
-## CI 校验
+```
+X402_SMOKE_CLIENT_PRIVATE_KEY=0x你的测试钱包私钥
+SMOKE_FORCE_DEPOSIT=1
+```
 
 ```bash
-npm run validate:rules   # 规则文件缺 source / 版本未 bump / updated_at 未更新 → 失败
-CHECK_RULE_LINKS=1 npm run check:links   # 法源链接存活检查；未设置该变量时跳过
+read -rs KEY && printf 'X402_SMOKE_CLIENT_PRIVATE_KEY=%s\nSMOKE_FORCE_DEPOSIT=1\n' "$KEY" >> .env.local
+node --env-file=.env.local --import tsx scripts/smoke-public.ts
 ```
 
-`check:links` 支持豁免清单 `scripts/link-exemptions.json`：清单内的 URL 只警告不
-失败（当前豁免 MAS Notices 官方入口，PSN01/PSN02 具体直达页待核实）。
+`.env.local` 已被本仓库的 `.gitignore`（`.env.*`）覆盖，不会被提交。行内写法传参
+（`X402_SMOKE_CLIENT_PRIVATE_KEY=0x... npm run smoke:public`）会让私钥同时留在
+shell 历史里，且同机其它进程可通过 `ps` 看到。上面的 `.env.local` + `--env-file`
+写法消除了 `ps` 暴露——但只有在私钥从未以明文出现在命令行时才能同时避开 shell
+历史：用编辑器创建该文件，或像上面那样用 `read -rs`（不回显、也不记入 shell
+历史），才能两者都避开。若直接用把私钥明文写进命令行的 `printf` 命令，私钥仍会
+留在 shell 历史里。
 
-## 测试
+这会对线上实例用真实测试网 USDC 完整跑一遍上面的流程并打印结果：
 
-```bash
-npm test
+```
+Payment settlement ID: c4449fea-c80a-4b40-97db-baf8740678cf
+evidence_hash: f89b48ed…ca2f
+overall: HOLD
 ```
 
-三层测试（详见 `docs/api.zh-CN.md` 或对应源码）：
+请使用**仅用于测试**、持有 Arc Testnet USDC 的钱包（可到
+[faucet.circle.com](https://faucet.circle.com/) 免费领取）——绝不要使用持有真实
+资产的钱包。`SMOKE_FORCE_DEPOSIT=1` 会在需要时自动把它存入你的 Circle Gateway
+余额（可能需要几分钟）。默认模块 `us-msb` 每次调用 `0.800000` 测试网 USDC。前置
+条件（Node 20+）与完整脚本说明见 [docs/deploy.md](docs/deploy.md)。
 
-1. 引擎单元测试：每条规则至少一个触发/不触发用例 + 确定性测试（同输入两次求值
-   `checks`/`evidence_hash` 完全一致）；
-2. golden 测试（`src/golden/citely-demo.test.ts`）：Citely Demo 场景（美国 Client →
-   新加坡 Marketplace → 英/德服务商，名义 10,000 USDC）四个模块的固定输入输出快照，
-   含 `evidence_hash` 跨运行一致性断言与 `disclaimer` 存在性断言；规则 version bump
-   后必须重新生成快照并人工 review diff；
-3. 集成测试：x402 402 → 支付 → 200 全流程（`base-sepolia` 走单元测试常态覆盖，
-   `arc-testnet` 走 `npm run smoke:arc` 真实链上冒烟，不进 `npm test` 常规流程）。
+## 这是什么
 
-## 配置项一览
+本项目是 Circle / Arc 黑客松方案（Citely Deal Desk v2.2）中合规检查模块的参考
+实现，也可被任何 agent 独立使用。它是一个确定性规则引擎——每个 check 结果与
+`evidence_hash` 都由带版本、带法源引用的规则文件机械推导，判定回路中完全不含
+LLM。每次调用通过 x402 在 Circle Arc Testnet 上以测试网 USDC 单独计费。输出是
+检查项状态，绝不是法律意见。
 
-完整模板见 `.env.example`（复制为 `.env` 后按需修改；真实收款地址/私钥永远不要
-提交到仓库）。核心配置项：
+## 参考与延伸阅读
 
-| 变量                                                                                  | 说明                                                                                        | 默认值                                                         |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                          | 源码默认 `x402-arc-testnet`（`.env.example` 示例显式写 `off`） |
-| `PORT`                                                                                | HTTP 监听端口                                                                               | `3000`                                                         |
-| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数                                                           | 分别为 `0.800000` / `0.400000` / `0.600000` / `0.200000`       |
-| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填                     | 占位地址，启用前必须替换                                       |
-| `MODULE_MAINTAINER_WALLET`                                                            | 全局维护者版税收款地址；x402 模式必填，可用四个 `{MODULE}_MAINTAINER_WALLET` 变量按模块覆盖 | `off` 模式回落零地址                                           |
-| `MODULE_ROYALTY_BPS`                                                                  | 全局版税基点（0–10000 整数），可用四个 `{MODULE}_ROYALTY_BPS` 变量按模块覆盖                | `0`                                                            |
-| `X402_ARC_TESTNET_FACILITATOR_URL`                                                    | Circle Arc Testnet hosted facilitator URL；仅 `x402-arc-testnet` 用                         | 无（该模式下必填）                                             |
-| `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL；仅 `x402-base-sepolia` 用                                     | 无（该模式下必填）                                             |
-| `CHECK_RULE_LINKS`                                                                    | 设为 `1` 启用规则法源链接存活检查（网络请求）                                               | `0`（跳过）                                                    |
-| `RULES_BASE_REF`                                                                      | 规则版本 CI 校验的 git 对比基准                                                             | `HEAD^`                                                        |
+- **[docs/api.zh-CN.md](docs/api.zh-CN.md)** — 完整 API 参考：每个端点、请求/响应
+  schema、错误码、`evidence_hash` 算法、支付模式与定价（含版税参数警示：
+  `maintainer_wallet` / `royalty_bps` 是运营参数，**不被 `evidence_hash` 背书**，
+  `maintainer_wallet` 为零地址表示本实例未配置版税收款方）。
+- **[docs/deploy.md](docs/deploy.md)** — 本地开发、测试与 CI、完整环境变量参考，
+  以及 Railway 部署 + ERC-8004 注册流程。
+- **[docs/marketplace/](docs/marketplace/)** — Circle Agent Marketplace 提交材料。
 
-`npm run smoke:arc` 额外使用的变量（真实链上冒烟专用，不影响 `npm run dev` /
-`npm test`）：`X402_SMOKE_CLIENT_PRIVATE_KEY`（必填，测试钱包私钥）、
-`SMOKE_ARC_RPC_URL`（可选，自定义 RPC）、`SMOKE_MODULE`（可选，默认 `us-msb`）、
-`SMOKE_PORT`（可选，默认 `4402`）、`SMOKE_DEPOSIT_USDC`（可选，默认 `1.50`）。
-
-## 公网部署与链上身份
-
-Railway 是部署平台；服务已上线，地址为
-<https://msb-agent-production-769d.up.railway.app>（见上文「线上服务」），健康检查
-指向 `GET /healthz`，这是唯一豁免限流的端点。部署步骤与两阶段 ERC-8004 注册流程见
-[docs/deploy.md](docs/deploy.md)。
-
-两个免费的 `/.well-known/` 端点承载链上身份：`GET /.well-known/agent-card.json`
-（<https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json>）由
-服务自身的模块元数据与定价确定性派生出一份 ERC-8004 registration-v1 文档；
-`GET /.well-known/agent-registration.json` 返回域名控制证明。**链上注册已完成**：
-Identity Registry `0x8004A818BFB912233c491871b3d84c89A494BD9e`（Arc Testnet）、
-Agent ID `851930`、注册交易
+服务已部署在上述 Railway 地址。ERC-8004 链上身份注册**已完成**：Identity
+Registry `0x8004A818BFB912233c491871b3d84c89A494BD9e`（Arc Testnet）、Agent ID
+`851930`、注册交易
 [`0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097`](https://testnet.arcscan.app/tx/0x519b1a5d94d0d4e28468cf4fd07143d776d78cf9df0035ea498b17fd48be2097)。
-agent card 的 `registrations` 字段与 `GET /.well-known/agent-registration.json`
-（返回 `200`）均已实测反映该状态。注册本身由 `scripts/register-8004.ts` 执行
-（`npm run register:8004`，默认只读探测，须显式加 `--confirm` 才发交易），并用
-`scripts/verify-8004.ts`（`npm run verify:8004`）做链上闭环校验；两者均在
-[docs/deploy.md](docs/deploy.md) 中说明。
+Circle Agent Marketplace 申请**已于 2026-07-27 提交，待 Circle 审核**——本仓库不
+声称该服务已上架或已通过审核。
 
-Circle Agent Marketplace 申请**尚未提交**；机器可读的 offering 元数据见
-[docs/marketplace/offering.json](docs/marketplace/offering.json)，可直接复制的提交材料
-与如实的状态跟踪表见 [docs/marketplace/listing.md](docs/marketplace/listing.md)。本仓库
-不声称该服务已上架或已通过审核。
+## 黑客松归属
+
+本项目是 Circle / Arc 黑客松方案（Citely Deal Desk v2.2）中 4 个 Compliance
+Module（方案流程图 F1–F3）的参考实现，在该方案里作为独立部署的 L1
+module-server，由主仓库的 L2 判定服务层通过 x402 调用。
 
 ---
 

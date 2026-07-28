@@ -7,35 +7,20 @@ import { decodePaymentRequiredHeader } from "@x402/core/http";
 
 import { createApp } from "../src/http/app.js";
 import { loadPaymentConfig } from "../src/payment/index.js";
-import { ModuleIdSchema, ModuleResponseSchema, type ModuleId } from "../src/schemas/index.js";
+import { ModuleResponseSchema } from "../src/schemas/index.js";
+import {
+  DEPOSIT_POLL_INTERVAL_MS,
+  DEPOSIT_POLL_MAX_ATTEMPTS,
+  getClientPrivateKey,
+  getDepositAmount,
+  getForceDeposit,
+  getSmokeModule,
+  MINIMUM_GATEWAY_BALANCE,
+  parseDepositAmountAtomic,
+  SMOKE_DEAL_INPUT,
+} from "./smoke-shared.js";
 
 const DEFAULT_SMOKE_PORT = 4402;
-const DEFAULT_DEPOSIT_USDC = "1.50";
-const MINIMUM_GATEWAY_BALANCE = 1_050_000n;
-const DEPOSIT_POLL_INTERVAL_MS = 15_000;
-const DEPOSIT_POLL_MAX_ATTEMPTS = 24;
-
-const SMOKE_DEAL_INPUT = {
-  deal_id: "arc-testnet-smoke",
-  parties: [
-    { role: "payer", country: "US", state: "NY" },
-    { role: "payee", country: "SG" },
-    { role: "payee", country: "GB" },
-    { role: "payee", country: "DE" },
-  ],
-  activity: "money_transmission",
-  amount_usdc: 10_000,
-  monthly_volume_usdc: 3_000_000,
-  evidence: {},
-};
-
-function getSmokeModule(): ModuleId {
-  const parsedModule = ModuleIdSchema.safeParse(process.env.SMOKE_MODULE ?? "us-msb");
-  if (!parsedModule.success) {
-    throw new Error(`SMOKE_MODULE 非法：${process.env.SMOKE_MODULE ?? ""}`);
-  }
-  return parsedModule.data;
-}
 
 function getSmokePort(): number {
   const rawPort = process.env.SMOKE_PORT ?? String(DEFAULT_SMOKE_PORT);
@@ -47,30 +32,6 @@ function getSmokePort(): number {
     throw new Error(`SMOKE_PORT 必须在 1 到 65535 之间：${rawPort}`);
   }
   return port;
-}
-
-function getClientPrivateKey(): `0x${string}` {
-  const rawPrivateKey = process.env.X402_SMOKE_CLIENT_PRIVATE_KEY?.trim();
-  const privateKey =
-    rawPrivateKey !== undefined && !rawPrivateKey.startsWith("0x")
-      ? `0x${rawPrivateKey}`
-      : rawPrivateKey;
-  if (privateKey === undefined || !/^0x[0-9a-fA-F]{64}$/.test(privateKey)) {
-    throw new Error("X402_SMOKE_CLIENT_PRIVATE_KEY 缺失或不是 32 字节十六进制私钥");
-  }
-  return privateKey as `0x${string}`;
-}
-
-function getDepositAmount(): string {
-  const configuredAmount = process.env.SMOKE_DEPOSIT_USDC?.trim();
-  const amount =
-    configuredAmount === undefined || configuredAmount === ""
-      ? DEFAULT_DEPOSIT_USDC
-      : configuredAmount;
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(amount) || Number(amount) <= 0) {
-    throw new Error(`SMOKE_DEPOSIT_USDC 必须是正数且最多 6 位小数：${amount}`);
-  }
-  return amount;
 }
 
 async function startServer(port: number): Promise<ServerType> {
@@ -106,11 +67,7 @@ async function runSmoke(): Promise<void> {
 
   const moduleId = getSmokeModule();
   const port = getSmokePort();
-  const forceDepositValue = (process.env.SMOKE_FORCE_DEPOSIT ?? "0").trim().toLowerCase();
-  if (!["0", "1", "false", "true"].includes(forceDepositValue)) {
-    throw new Error("SMOKE_FORCE_DEPOSIT 只接受 0、1、false 或 true");
-  }
-  const isForceDeposit = forceDepositValue === "1" || forceDepositValue === "true";
+  const isForceDeposit = getForceDeposit();
   const rpcUrl = process.env.SMOKE_ARC_RPC_URL?.trim();
   const gatewayClient = new GatewayClient({
     chain: "arcTestnet",
@@ -137,8 +94,7 @@ async function runSmoke(): Promise<void> {
       isForceDeposit || balances.gateway.available < MINIMUM_GATEWAY_BALANCE;
     if (isDepositRequired) {
       const depositAmount = getDepositAmount();
-      const [wholeAmount = "0", fractionalAmount = ""] = depositAmount.split(".");
-      const depositAtomic = BigInt(`${wholeAmount}${fractionalAmount.padEnd(6, "0")}`);
+      const depositAtomic = parseDepositAmountAtomic(depositAmount);
       const expectedAvailable = balances.gateway.available + depositAtomic;
 
       process.stdout.write(

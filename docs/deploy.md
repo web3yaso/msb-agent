@@ -1,10 +1,65 @@
-# 公网部署与 ERC-8004 注册
+# 本地开发、公网部署与 ERC-8004 注册
 
 > 本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。
 
 当前线上实例：<https://msb-agent-production-769d.up.railway.app>（Railway，已实测
 `/healthz`、`/modules`、`/.well-known/agent-card.json`、`POST /modules/:id/check`
-的 402 报价流程；见 README「Live Demo / 线上服务」小节的可复制 curl 示例）。
+的 402 报价流程；见 README「AI Agent 接入三步」小节的可复制 curl 示例）。
+
+## 本地开发
+
+要求：Node.js 20+（开发环境用 Node 22/25 验证过）、npm。
+
+```bash
+npm install
+cp .env.example .env
+```
+
+`.env.example` 默认给出 `PAYMENT_MODE=off`（本地无支付启动，注意：这只是示例文件里
+的显式值，源码默认值是 `x402-arc-testnet`，见下文「环境变量」）。以 off 模式启动：
+
+```bash
+npm run dev        # tsx watch，监听 PORT（默认 3000）
+npm test            # vitest run，含引擎/HTTP/golden/支付层测试
+npx tsc --noEmit    # 类型检查
+```
+
+启动后可直接试探发现端点：
+
+```bash
+curl http://localhost:3000/modules
+curl http://localhost:3000/modules/us-msb/schema
+```
+
+`off` 模式下 `POST /modules/:id/check` 不收费，可直接联调业务逻辑；`x402-*` 模式下
+同一端点会先返回 HTTP 402（见下文「环境变量」与 `docs/api.md` 的「Payment Modes and
+Pricing」）。
+
+## 测试与 CI
+
+```bash
+npm test
+```
+
+三层测试（详见 `docs/api.zh-CN.md` 或对应源码）：
+
+1. 引擎单元测试：每条规则至少一个触发/不触发用例 + 确定性测试（同输入两次求值
+   `checks`/`evidence_hash` 完全一致）；
+2. golden 测试（`src/golden/citely-demo.test.ts`）：Citely Demo 场景（美国 Client →
+   新加坡 Marketplace → 英/德服务商，名义 10,000 USDC）四个模块的固定输入输出快照，
+   含 `evidence_hash` 跨运行一致性断言与 `disclaimer` 存在性断言；规则 version bump
+   后必须重新生成快照并人工 review diff；
+3. 集成测试：x402 402 → 支付 → 200 全流程（`base-sepolia` 走单元测试常态覆盖，
+   `arc-testnet` 走 `npm run smoke:arc` 真实链上冒烟——见下方「本地对 Arc Testnet
+   的真实链上冒烟」——不进 `npm test` 常规流程）。
+
+```bash
+npm run validate:rules   # 规则文件缺 source / 版本未 bump / updated_at 未更新 → 失败
+CHECK_RULE_LINKS=1 npm run check:links   # 法源链接存活检查；未设置该变量时跳过
+```
+
+`check:links` 支持豁免清单 `scripts/link-exemptions.json`：清单内的 URL 只警告不
+失败（当前豁免 MAS Notices 官方入口，PSN01/PSN02 具体直达页待核实）。
 
 ## Railway 部署
 
@@ -49,6 +104,52 @@ Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选�
 `ERC8004_REGISTRAR_PRIVATE_KEY`。**`ERC8004_REGISTRAR_PRIVATE_KEY` 不要写入部署平台**；
 它只应在本地运行注册与校验脚本时临时设置。注册钱包应与收款及维护者钱包分离，只放不
 超过约 1 USDC 的测试网 gas。
+
+### 完整配置项参考表
+
+完整模板见 `.env.example`（复制为 `.env` 后按需修改；真实收款地址/私钥永远不要
+提交到仓库）。核心配置项：
+
+| 变量                                                                                  | 说明                                                                                        | 默认值                                                         |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                          | 源码默认 `x402-arc-testnet`（`.env.example` 示例显式写 `off`） |
+| `PORT`                                                                                | HTTP 监听端口                                                                               | `3000`                                                         |
+| `PUBLIC_BASE_URL`                                                                     | 公网 HTTPS 基地址；`off` 模式未设时回落 localhost，付费模式必填                              | 无                                                              |
+| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数                                                           | 分别为 `0.800000` / `0.400000` / `0.600000` / `0.200000`       |
+| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填                     | 占位地址，启用前必须替换                                       |
+| `MODULE_MAINTAINER_WALLET`                                                            | 全局维护者版税收款地址；x402 模式必填，可用四个 `{MODULE}_MAINTAINER_WALLET` 变量按模块覆盖 | `off` 模式回落零地址                                           |
+| `MODULE_ROYALTY_BPS`                                                                  | 全局版税基点（0–10000 整数），可用四个 `{MODULE}_ROYALTY_BPS` 变量按模块覆盖                | `0`                                                            |
+| `X402_ARC_TESTNET_FACILITATOR_URL`                                                    | Circle Arc Testnet hosted facilitator URL；仅 `x402-arc-testnet` 用                         | 无（该模式下必填）                                             |
+| `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL；仅 `x402-base-sepolia` 用                                     | 无（该模式下必填）                                             |
+| `CHECK_RULE_LINKS`                                                                    | 设为 `1` 启用规则法源链接存活检查（网络请求）                                               | `0`（跳过）                                                    |
+| `RULES_BASE_REF`                                                                      | 规则版本 CI 校验的 git 对比基准                                                             | `HEAD^`                                                        |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_TRUST_PROXY_HEADER`  | 限流窗口/上限/是否信任代理头（见上文）                                                       | `60000` / `60` / `false`                                      |
+| `ERC8004_IDENTITY_REGISTRY` / `ERC8004_AGENT_ID`                                      | ERC-8004 公开身份信息（见「阶段 1-4」）                                                     | 无                                                              |
+
+## 本地对 Arc Testnet 的真实链上冒烟
+
+`npm run smoke:arc` 针对**本地启动的服务**（而非公网实例，公网实例的真实付费见
+README「AI Agent 接入三步」的 `npm run smoke:public`）跑一次真实链上 402 → 支付 →
+200：
+
+```bash
+PAYMENT_MODE=x402-arc-testnet \
+MODULE_MAINTAINER_WALLET=<维护者钱包地址> \
+X402_SMOKE_CLIENT_PRIVATE_KEY=<测试钱包私钥，占位符，不要提交到仓库> \
+npm run smoke:arc
+```
+
+`x402-arc-testnet` 模式要求 `MODULE_MAINTAINER_WALLET` 已设置，否则服务会在启动时
+fail-fast；`npm run smoke:arc` 同样受此校验约束。本仓库已跑通一次真实冒烟（非占位
+数据）：Gateway 存款交易
+`0xfcc78968b336ac103fe577cfd74075309cf70720eb086a7394c28146d83919f7`，支付结算 ID
+`49f19918-632c-4ffe-9869-27be6472ac69`。
+
+脚本相关环境变量：`X402_SMOKE_CLIENT_PRIVATE_KEY`（必填，测试钱包私钥）、
+`SMOKE_ARC_RPC_URL`（可选，自定义 RPC）、`SMOKE_MODULE`（可选，默认 `us-msb`）、
+`SMOKE_PORT`（可选，默认 `4402`）、`SMOKE_DEPOSIT_USDC`（可选，默认 `1.50`）、
+`SMOKE_FORCE_DEPOSIT`（可选，`0`/`1`/`false`/`true`，为真时余额不足自动调用
+`GatewayClient.deposit(...)` 存款并轮询等待到账）。
 
 ## 阶段 1：先部署 agent card
 

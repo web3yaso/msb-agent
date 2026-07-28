@@ -12,6 +12,32 @@ names, enum values, and required/optional-ness all follow the zod definitions;
 every example below comes from an actual request/response reproducible via
 `npm test`, not written from memory).
 
+## Background
+
+This service is the L1 knowledge-and-supply layer (module-server) in the
+Citely Global Agent Deal Desk (cleardesk) four-layer architecture: the L2
+adjudication service layer (case engine, in a separate main repository) calls
+this service over HTTP + x402 paid requests; this repo is deployed
+independently and is not folded into the main-repo monorepo. A caller (L2, or
+any agent) reads `evidence_hash` from the `200` response after a successful
+payment (offline-replayable to verify which rules and results the call relied
+on) and `maintainer_wallet` / `royalty_bps` (used for a royalty
+micropayment). This service only outputs check-item status — it performs no
+settlement orchestration and produces no legal advice.
+
+## Module Overview
+
+| Module   | Jurisdiction                                           | Acceptance condition                        |
+| -------- | -------------------------------------------------------- | ------------------------------------------- |
+| `us-msb` | United States (federal + New York State)               | any party with `country = "US"`             |
+| `uk-msb` | United Kingdom                                          | any party with `country = "GB"`             |
+| `eu-msb` | European Union (incl. DE/FR/NL member-state specifics) | any party in one of the 27 EU member states |
+| `sg-msb` | Singapore                                               | any party with `country = "SG"`             |
+
+**Out of scope**: automated rule updates, multilingual output, KYB/wallet data
+procurement (belongs to Citely F4, a different provider), Jurisdiction Review
+(belongs to Citely F5), and real legal advice.
+
 > **Note on literal string values**: throughout this document, JSON example values
 > that the live service returns verbatim — the `disclaimer` field, `reason` text,
 > and error `message` text — are preserved in the original Chinese, because that is
@@ -23,8 +49,8 @@ every example below comes from an actual request/response reproducible via
 
 Base URL: local development defaults to `http://localhost:3000` (`PORT`
 configurable). Current live instance:
-`https://msb-agent-production-769d.up.railway.app` (Railway; see the README
-"Live Demo" section).
+`https://msb-agent-production-769d.up.railway.app` (Railway; see the README's
+"For AI Agents: Integrate in 3 Steps" section).
 
 ## Endpoint Overview
 
@@ -61,6 +87,64 @@ legal sources, endpoints, public payment parameters, and the disclaimer;
 payment parameters are **not** covered by `evidence_hash`. `GET
 /static/agent-icon.png` (the image the agent card's `image` field points to)
 is served with `Cache-Control: public, max-age=86400`.
+
+---
+
+## Payment Modes and Pricing
+
+Three `PAYMENT_MODE` tiers, **the source-code default is `x402-arc-testnet`**
+(the default is never allowed to be `off` — this is an architectural red
+line):
+
+| Mode                | Purpose                                                               | Network                       |
+| ------------------- | ----------------------------------------------------------------------- | ------------------------------ |
+| `off`               | Local development / unit tests; must be set explicitly to take effect | no payment is initiated       |
+| `x402-base-sepolia` | Fallback: degraded demo path if the Arc facilitator is unstable       | Base Sepolia, `eip155:84532`  |
+| `x402-arc-testnet`  | **Primary target**: Circle's hosted testnet facilitator               | Arc Testnet, `eip155:5042002` |
+
+Differentiated default pricing per module, overridable via the corresponding
+`{MODULE}_PRICE_USDC` environment variable:
+
+| Module   | Price per call (testnet USDC) |
+| -------- | ----------------------------: |
+| `us-msb` |                    `0.800000` |
+| `eu-msb` |                    `0.600000` |
+| `uk-msb` |                    `0.400000` |
+| `sg-msb` |                    `0.200000` |
+
+Valid price range is `0 < price <= 100`, validated at startup and normalized
+to six decimal places; invalid values immediately abort startup, guarding
+against a misplaced decimal point causing a billing incident. Payee addresses
+are configured via four `{MODULE}_PAY_TO` environment variables — public
+information that appears in the `GET /modules` response, but is never written
+into code or documentation.
+
+Arc Testnet's settlement scheme is Circle Gateway's `GatewayWalletBatched`
+(`@x402/hono` + `@circle-fin/x402-batching`). Here is the core of a real,
+live-verified `402` response's `payment-required` header, base64-decoded:
+
+```json
+{
+  "resource": { "url": "https://msb-agent-production-769d.up.railway.app/modules/us-msb/check" },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:5042002",
+      "amount": "800000",
+      "asset": "0x3600000000000000000000000000000000000000",
+      "payTo": "0x76B05e56872E097dB94Ee8cD55de7882603047B9",
+      "extra": { "name": "GatewayWalletBatched", "version": "1" }
+    }
+  ]
+}
+```
+
+`amount` is in atomic units (USDC has 6 decimals, so `800000` = 0.8 USDC);
+`asset` is USDC's contract address on Arc Testnet. Completing a payment
+requires the caller's wallet's USDC to already be deposited into its Circle
+Gateway balance (not merely held in the wallet). `scripts/smoke-public.ts`
+(`npm run smoke:public`) in this repo demonstrates the full payment loop
+against the live instance — see the README's "Integrate in 3 Steps" section.
 
 ---
 
@@ -392,10 +476,10 @@ The rule fields `when.amount_gte` / `when.monthly_volume_gte` express a
 **On the `402` response**: the response body is an empty JSON object (`{}`);
 the actual x402 price quote is not in the body, it is base64-encoded in the
 `payment-required` response header, per the x402 protocol (verified live
-against the deployed instance; see the README "Live Demo" section for a
-copy-pasteable example). An x402-aware client decodes that header
-automatically — a plain `curl` without x402 support will only see `402` and
-an empty body.
+against the deployed instance; see the README's "For AI Agents: Integrate in
+3 Steps" section for a copy-pasteable example). An x402-aware client decodes
+that header automatically — a plain `curl` without x402 support will only see
+`402` and an empty body.
 
 **Idempotency after payment**: once an x402 payment has been accepted, if
 engine evaluation or response serialization then throws (→ `500`), the

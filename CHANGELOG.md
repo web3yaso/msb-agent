@@ -22,6 +22,15 @@
 - API 文档拆分为双语版本：`docs/api.md`（英文，供 Circle Marketplace 申请表单的
   Documentation URL 引用）与新增的 `docs/api.zh-CN.md`（中文，原文完整迁移）；
   README.md / README.zh-CN.md 中指向 `docs/api.md` 的交叉链接与锚点同步更新。
+- README.md / README.zh-CN.md 按"agent 开发者优先"重构：新首节"For AI Agents:
+  Integrate in 3 Steps" / "AI Agent 接入三步"（发现/支付/验证 + `npm run
+  smoke:public` 一键体验），全文长度砍到约三分之一；被移除的长配置表、限流细节、
+  支付层详述、CI/测试说明迁移进 `docs/api.md`（新增「Background」「Module
+  Overview」「Payment Modes and Pricing」小节）与 `docs/deploy.md`（新增「本地
+  开发」「测试与 CI」「完整配置项参考表」「本地对 Arc Testnet 的真实链上冒烟」
+  小节，标题相应扩展为「本地开发、公网部署与 ERC-8004 注册」）；版税参数警示、
+  链上注册完成状态、Marketplace 提交状态等事实性内容保留（前者移入 api.md，后两者
+  在 README 保留精简版）。
 - 版本号 `0.2.0` → `0.3.0`。
 
 ### 未变更（不变量）

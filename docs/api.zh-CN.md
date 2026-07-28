@@ -8,9 +8,30 @@
 本文档与 `src/schemas/` 下的 zod schema 保持一致（字段名、枚举值、必填/可选性均以
 zod 定义为准；本文示例均来自可通过 `npm test` 复现的实际请求/响应，不是凭记忆编写）。
 
+## 背景
+
+本服务是 Citely Global Agent Deal Desk（cleardesk）四层架构中的 L1 知识与供给层
+（module-server）：L2 判定服务层（案件引擎，位于另一个主仓库）通过 HTTP + x402
+付费调用本服务，本仓库独立部署，不并入主仓库 monorepo。调用方（L2 或任何 agent）
+在支付成功后从 200 响应读取 `evidence_hash`（可离线重放验证本次调用依据的规则与
+结果）与 `maintainer_wallet` / `royalty_bps`（用于版税微支付）；本服务只输出检查
+项状态，不做结算编排，不产出法律意见。
+
+## 模块一览
+
+| 模块     | 法域                               | 受理条件                        |
+| -------- | ----------------------------------- | -------------------------------- |
+| `us-msb` | 美国（联邦 + 纽约州）              | 任一 party `country = "US"`     |
+| `uk-msb` | 英国                               | 任一 party `country = "GB"`     |
+| `eu-msb` | 欧盟（含德/法/荷成员国专项检查项） | 任一 party 落在 27 个欧盟成员国 |
+| `sg-msb` | 新加坡                             | 任一 party `country = "SG"`     |
+
+**不做**：规则自动更新、多语言输出、KYB/钱包数据采购（属 Citely F4，另一供应商）、
+Jurisdiction Review（属 Citely F5）、真实法律意见。
+
 Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当前线上实例：
-`https://msb-agent-production-769d.up.railway.app`（Railway，见 README「Live Demo /
-线上服务」小节）。
+`https://msb-agent-production-769d.up.railway.app`（Railway，见 README「AI Agent
+接入三步」小节）。
 
 ## 端点一览
 
@@ -39,6 +60,57 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 价格、法源、端点、公开支付参数以及免责声明；支付参数不受 `evidence_hash` 背书。
 `GET /static/agent-icon.png`（agent card `image` 字段指向的图片）响应使用
 `Cache-Control: public, max-age=86400`。
+
+---
+
+## 支付模式与定价
+
+三档 `PAYMENT_MODE`，**源码默认值为 `x402-arc-testnet`**（默认不允许是 `off`，
+这是一条架构红线）：
+
+| 模式                | 用途                                          | 网络                          |
+| ------------------- | --------------------------------------------- | ----------------------------- |
+| `off`               | 本地开发 / 单元测试；必须显式设置才生效       | 不发起支付                    |
+| `x402-base-sepolia` | 兜底：Arc facilitator 不稳定时的降级演示      | Base Sepolia，`eip155:84532`  |
+| `x402-arc-testnet`  | **主目标**：Circle hosted testnet facilitator | Arc Testnet，`eip155:5042002` |
+
+四模块差异化默认定价（可用对应 `{MODULE}_PRICE_USDC` 环境变量覆盖）：
+
+| 模块     | 每次调用价格（测试网 USDC） |
+| -------- | --------------------------: |
+| `us-msb` |                  `0.800000` |
+| `eu-msb` |                  `0.600000` |
+| `uk-msb` |                  `0.400000` |
+| `sg-msb` |                  `0.200000` |
+
+价格合法范围为 `0 < price <= 100`，启动时校验并规范化为六位小数；非法值直接拒绝
+启动，防止小数点错位造成计费事故。收款地址通过四个 `{MODULE}_PAY_TO` 环境变量
+配置——是公开信息，会出现在 `GET /modules` 响应里，但从不写入代码或文档。
+
+Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
+（`@x402/hono` + `@circle-fin/x402-batching`）。以线上实例实测的 402 响应为例，
+`payment-required` 响应头 base64 解码后的核心字段：
+
+```json
+{
+  "resource": { "url": "https://msb-agent-production-769d.up.railway.app/modules/us-msb/check" },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:5042002",
+      "amount": "800000",
+      "asset": "0x3600000000000000000000000000000000000000",
+      "payTo": "0x76B05e56872E097dB94Ee8cD55de7882603047B9",
+      "extra": { "name": "GatewayWalletBatched", "version": "1" }
+    }
+  ]
+}
+```
+
+`amount` 是原子单位（USDC 6 位小数，`800000` = 0.8 USDC）；`asset` 是 Arc Testnet
+上 USDC 的合约地址。完成支付要求调用方钱包的 USDC 已经存入 Circle Gateway 余额
+（不是仅停留在钱包里）。本仓库的 `scripts/smoke-public.ts`（`npm run smoke:public`）
+演示了对线上实例的完整支付闭环，用法见 README「AI Agent 接入三步」。
 
 ---
 
