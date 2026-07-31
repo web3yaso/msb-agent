@@ -424,6 +424,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<Hono> {
         escalated_check_ids: engineResult.checks
           .filter(({ result }) => result === "ESCALATE")
           .map(({ id }) => id),
+        evaluated_check_count: engineResult.checks.filter(
+          ({ result }) => result !== "NOT_APPLICABLE",
+        ).length,
         evidence_hash: engineResult.evidence_hash,
       },
       evidence_hash: engineResult.evidence_hash,

@@ -28,6 +28,7 @@ export const SettlementConstraintsSchema = z.strictObject({
   valid_until: UtcDateTimeSchema,
   blocked_check_ids: z.array(z.string().min(1)),
   escalated_check_ids: z.array(z.string().min(1)),
+  evaluated_check_count: z.number().int().nonnegative(),
   evidence_hash: EvidenceHashSchema,
 });
 

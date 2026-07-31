@@ -284,24 +284,25 @@ Request example:
 
 `CheckResult`:
 
-| Field    | Description                                                                                                                                                    |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`     | Rule id, e.g. `us-fincen-registration-money-transmission`                                                                                                      |
-| `result` | `PASS` \| `HOLD` \| `ESCALATE` \| `NOT_APPLICABLE`                                                                                                             |
-| `basis`  | Machine-readable basis: `not_applicable`, `caller_assertion`, `missing_evidence`, `deterministic_threshold`, `insufficient_aggregate_data`, or `manual_review` |
-| `reason` | Human-readable reason (not part of `evidence_hash`; wording fixes never change the hash)                                                                       |
-| `source` | Legal source citation (corresponds to the rule file's `source` field)                                                                                          |
+| Field    | Description                                                                                                                                                                                                                                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`     | Rule id, e.g. `us-fincen-registration-money-transmission`                                                                                                                                                                                                                                                                                   |
+| `result` | `PASS` \| `HOLD` \| `ESCALATE` \| `NOT_APPLICABLE`                                                                                                                                                                                                                                                                                          |
+| `basis`  | Machine-readable basis: `not_applicable`, `caller_assertion`, `missing_evidence`, `deterministic_threshold` (monthly volume below threshold), `insufficient_aggregate_data` (single amount below threshold or monthly volume missing), or `manual_review` (including defensive handling of an applicable rule with no evidence requirement) |
+| `reason` | Human-readable reason (not part of `evidence_hash`; wording fixes never change the hash)                                                                                                                                                                                                                                                    |
+| `source` | Legal source citation (corresponds to the rule file's `source` field)                                                                                                                                                                                                                                                                       |
 
 `SettlementConstraints`:
 
-| Field                       | Description                                                                                                                                                                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `module` / `module_version` | Redundant copies of the root fields, so the payload is self-describing when passed to the settlement layer independently                                                                                                                                                                                |
-| `deal_id`                   | Echoes the request's `deal_id`                                                                                                                                                                                                                                                                          |
-| `valid_until`               | Request time (UTC) + 72 hours, ISO8601. **When `PASS`**, means "this result may be referenced by the settlement layer within 72h"; **when `HOLD`/`ESCALATE`**, means "this blocking state may be referenced within 72h" — expiry does not imply approval, it only means the case needs to be re-checked |
-| `blocked_check_ids`         | Only the ids of checks with `result = HOLD` (the "missing evidence, hold payment" routing path)                                                                                                                                                                                                         |
-| `escalated_check_ids`       | Only the ids of checks with `result = ESCALATE` (the "gray area, route to human review" path, kept separate from the above)                                                                                                                                                                             |
-| `evidence_hash`             | Identical to the root-level field                                                                                                                                                                                                                                                                       |
+| Field                       | Description                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `module` / `module_version` | Redundant copies of the root fields, so the payload is self-describing when passed to the settlement layer independently                                                                                                                                                                                                                                                                                |
+| `deal_id`                   | Echoes the request's `deal_id`                                                                                                                                                                                                                                                                                                                                                                          |
+| `valid_until`               | Request time (UTC) + 72 hours, ISO8601. **When `PASS`**, means "this result may be referenced by the settlement layer within 72h"; **when `HOLD`/`ESCALATE`**, means "this blocking state may be referenced within 72h"; **when `NOT_APPLICABLE`**, means "the no-applicable-check result may be referenced within 72h" — expiry does not imply approval, it only means the case needs to be re-checked |
+| `blocked_check_ids`         | Only the ids of checks with `result = HOLD` (the "missing evidence, hold payment" routing path)                                                                                                                                                                                                                                                                                                         |
+| `escalated_check_ids`       | Only the ids of checks with `result = ESCALATE` (the "gray area, route to human review" path, kept separate from the above)                                                                                                                                                                                                                                                                             |
+| `evaluated_check_count`     | Number of checks whose result is not `NOT_APPLICABLE`; `0` means this module's rule set did not evaluate the transaction                                                                                                                                                                                                                                                                                |
+| `evidence_hash`             | Identical to the root-level field                                                                                                                                                                                                                                                                                                                                                                       |
 
 ### Aggregation Semantics
 
@@ -311,6 +312,18 @@ Any check with `ESCALATE` → `overall = ESCALATE`; otherwise any check with
 `NOT_APPLICABLE`, the overall result is also `NOT_APPLICABLE`
 (`aggregateCheckStatus` in `src/engine/engine.ts`, priority order
 `ESCALATE > HOLD > PASS > NOT_APPLICABLE`).
+
+`overall = NOT_APPLICABLE` means that this module's rule set has no applicable
+check item for the transaction. It is **not** an approval and does not mean the
+transaction passed compliance checks; downstream systems must use another
+jurisdiction module or route the transaction to human review. In this case,
+empty `blocked_check_ids` and `escalated_check_ids` are expected and **must not
+be treated as an approval signal**.
+
+The recommended downstream approval predicate is: both check-id lists are
+empty **and** `evaluated_check_count > 0`. When `evaluated_check_count === 0`,
+this module's rule set did not evaluate the transaction, so downstream systems
+**must not approve it**.
 
 ### `evidence_hash` and `settlement_constraints`
 
@@ -324,8 +337,10 @@ evidence_hash = sha256( canon(version_context) || 0x1F || rules_file_bytes || 0x
   JSON-canonicalized — the file itself is a versioned artifact, and its bytes
   are its identity);
 - `canon(input)`: `{deal_id, parties, activity, amount_usdc,
-monthly_volume_usdc?, evidence}` canonicalized in RFC 8785 (JCS) style (keys
-  sorted lexicographically, no whitespace, strings in NFC); `parties` is
+monthly_volume_usdc?, evidence}` canonicalized with this project's own JSON
+  canonicalization rules (not RFC 8785 JCS): object keys and string values are
+  normalized to Unicode NFC, keys are sorted lexicographically, and whitespace
+  is omitted; `parties` is
   sorted by `(role, country, state)` first, so array write order does not
   affect the hash; when `monthly_volume_usdc` is `undefined` the whole field
   is omitted (not written as `null`);
@@ -334,6 +349,9 @@ monthly_volume_usdc?, evidence}` canonicalized in RFC 8785 (JCS) style (keys
   hash; a `result` or `basis` change is a substantive change;
 - `0x1F` (Unit Separator) separates the four segments; each segment is itself
   valid JSON/UTF-8, eliminating concatenation ambiguity.
+
+`valid_until` is **not covered by `evidence_hash`**: it is derived from the
+issuance time and is not part of the decision input.
 
 This algorithm is a public specification; a purchaser or third-party auditor
 can offline-replay `evidence_hash` from the same rule file, the same request
@@ -471,7 +489,8 @@ The rule fields `when.amount_gte` / `when.monthly_volume_gte` express a
   aggregate is ≥ the threshold, but **a single transaction < the threshold
   cannot imply the aggregate < the threshold**. So when the rule condition is
   "not triggered", the engine still outputs `HOLD`
-  (`reason: "单笔未达门槛，聚合情形需采购方自行核实"`), **never `PASS`**;
+  (`basis: "insufficient_aggregate_data"`,
+  `reason: "单笔未达门槛，聚合情形需采购方自行核实"`), **never `PASS`**;
 - `monthly_volume_gte` depends on the optional `monthly_volume_usdc` field:
   when missing (`undefined` or `null`) → the relevant check item is `HOLD`,
   `reason: "无法判定分级，需补交易量数据"`; when present but below the

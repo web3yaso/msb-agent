@@ -44,6 +44,7 @@ const validSettlementConstraints = {
   valid_until: "2026-07-27T00:00:00Z",
   blocked_check_ids: ["us-fincen-registration"],
   escalated_check_ids: [],
+  evaluated_check_count: 1,
   evidence_hash: EVIDENCE_HASH,
 };
 
@@ -102,6 +103,17 @@ describe("响应 schemas", () => {
   it("接受 CheckResult 和 settlement_constraints 契约", () => {
     expect(CheckResultSchema.safeParse(validCheckResult).success).toBe(true);
     expect(SettlementConstraintsSchema.safeParse(validSettlementConstraints).success).toBe(true);
+  });
+
+  it("settlement_constraints 要求已评估检查数", () => {
+    const constraintsWithoutEvaluatedCount: Record<string, unknown> = {
+      ...validSettlementConstraints,
+    };
+    delete constraintsWithoutEvaluatedCount.evaluated_check_count;
+
+    expect(SettlementConstraintsSchema.safeParse(constraintsWithoutEvaluatedCount).success).toBe(
+      false,
+    );
   });
 
   it("接受包含 updated_at 和 escalated_check_ids 的 ModuleResponse", () => {
@@ -210,6 +222,17 @@ describe("规则 schemas", () => {
       RuleSchema.safeParse({
         ...validRule,
         when: { party_city: "New York" },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("拒绝无证据要求且不强制升级的空判定规则", () => {
+    expect(
+      RuleSchema.safeParse({
+        ...validRule,
+        when: {},
+        required_evidence: [],
+        always_escalate: false,
       }).success,
     ).toBe(false);
   });

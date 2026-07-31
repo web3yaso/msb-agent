@@ -40,6 +40,8 @@ describe("agent card", () => {
     expect(card["x-msb"]).toMatchObject({
       engine_version: "1.0.0",
       hash_scheme_version: "2",
+      evidence_hash_definition:
+        "sha256(canonical_version_context || 0x1F || rules_file_bytes || 0x1F || canonical_input || 0x1F || canonical(checks[{id,result,basis}] sorted by id))",
     });
   });
 

@@ -99,6 +99,9 @@ A successful `200` response has this shape (not a literal example — see
 }
 ```
 
+`overall = NOT_APPLICABLE` means this module has no applicable checks; it is
+not an approval or a compliance pass.
+
 `evidence_hash` is a sha256 over the version context, rule file bytes,
 canonicalized input, and canonicalized checks — anyone can replay it offline
 with the same public rule files to verify that those artifacts and the result

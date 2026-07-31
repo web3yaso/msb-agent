@@ -7,6 +7,35 @@
 
 ## [Unreleased]
 
+### 破坏性变更
+
+- `ModuleResponse` 新增必填字段 `engine_version` / `hash_scheme_version`；使用严格
+  schema 校验的既有消费方会解析失败。
+- `settlement_constraints` 新增必填字段 `evaluated_check_count`；使用严格 schema
+  校验的既有消费方会解析失败。
+- `CheckStatus` 枚举扩容为 `PASS` / `HOLD` / `ESCALATE` / `NOT_APPLICABLE` 四值；
+  对旧枚举做穷举 switch 的消费方会遗漏新分支。
+- Evidence hash 升级后全部 `evidence_hash` 取值改变；依赖旧值的缓存与对账逻辑会
+  全量 miss。消费方可读取 `response.hash_scheme_version` 区分新旧预映射方案。
+- 空证据要求且非 `always_escalate` 的规则现在会在校验期被拒绝；运行时遇到此类规则
+  会防御性返回 `ESCALATE` / `manual_review`，不再返回 `PASS`。
+
+### 版本裁决留痕
+
+- **`ENGINE_VERSION` 保持 `1.0.0`，未 bump。** 本次确实改动了引擎判定语义
+  （空证据分支由 `PASS` 改为 `ESCALATE`），字面上触及"引擎判定语义变更必须 bump"
+  这条约束，豁免理由如下：
+  1. 该分支对**任何能通过 schema 校验的规则文件均不可达**——`RuleSchema` 新增的硬闸
+     会在校验期拒绝此类规则，四个法域共 26 条规则实测 26/26 全部通过且行为不变；
+  2. 实证：四个模块的 `evidence_hash` 与改动前**逐字符一致**，由三个互不依赖的
+     实现路径独立复算确认，即语义变化在可观测层面为零；
+  3. `ENGINE_VERSION` 由本轮变更集自身引入，`1.0.0` 从未对外发布过，
+     不存在以旧语义签发的历史证据需要区分；
+  4. 若强行 bump，四个 `evidence_hash` 会全部改变，等于再次作废已公示的哈希值，
+     纯损失。
+- `hash_scheme_version` 同样保持 `"2"`：`evaluated_check_count` 可由 `checks[]` 推导，
+  不进入哈希预映射，预映射字节序列一字未动。
+
 ### 变更
 
 - 增加 `NOT_APPLICABLE`，不再用 `PASS` 表示规则未触发或已知数值低于适用门槛。

@@ -243,24 +243,25 @@ Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
 
 `CheckResult`：
 
-| 字段     | 说明                                                                                                                                                |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`     | 规则 id，如 `us-fincen-registration-money-transmission`                                                                                             |
-| `result` | `PASS` \| `HOLD` \| `ESCALATE` \| `NOT_APPLICABLE`                                                                                                  |
-| `basis`  | 机器可读依据：`not_applicable`、`caller_assertion`、`missing_evidence`、`deterministic_threshold`、`insufficient_aggregate_data` 或 `manual_review` |
-| `reason` | 人类可读原因（不参与 `evidence_hash` 计算，措辞修正不改变 hash）                                                                                    |
-| `source` | 法源引用（对应规则文件 `source` 字段）                                                                                                              |
+| 字段     | 说明                                                                                                                                                                                                                                             |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`     | 规则 id，如 `us-fincen-registration-money-transmission`                                                                                                                                                                                          |
+| `result` | `PASS` \| `HOLD` \| `ESCALATE` \| `NOT_APPLICABLE`                                                                                                                                                                                               |
+| `basis`  | 机器可读依据：`not_applicable`、`caller_assertion`、`missing_evidence`、`deterministic_threshold`（月交易量低于门槛）、`insufficient_aggregate_data`（单笔金额低于门槛或月交易量缺失）或 `manual_review`（包括适用规则无证据要求时的防御性处理） |
+| `reason` | 人类可读原因（不参与 `evidence_hash` 计算，措辞修正不改变 hash）                                                                                                                                                                                 |
+| `source` | 法源引用（对应规则文件 `source` 字段）                                                                                                                                                                                                           |
 
 `SettlementConstraints`：
 
-| 字段                        | 说明                                                                                                                                                                   |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `module` / `module_version` | 冗余自根字段，便于独立传入结算层且自证来源                                                                                                                             |
-| `deal_id`                   | 回显请求 `deal_id`                                                                                                                                                     |
-| `valid_until`               | 请求时间（UTC）+ 72 小时，ISO8601。**`PASS` 时**表示"72h 内本结果可被结算层引用"；**`HOLD`/`ESCALATE` 时**表示"72h 内本阻断状态可被引用"——过期不等于放行，只表示需重查 |
-| `blocked_check_ids`         | 仅含 `result = HOLD` 的 check id（"缺证据暂停付款"路由）                                                                                                               |
-| `escalated_check_ids`       | 仅含 `result = ESCALATE` 的 check id（"灰区转人工"路由，与上者分开路由）                                                                                               |
-| `evidence_hash`             | 同响应根字段                                                                                                                                                           |
+| 字段                        | 说明                                                                                                                                                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `module` / `module_version` | 冗余自根字段，便于独立传入结算层且自证来源                                                                                                                                                                                              |
+| `deal_id`                   | 回显请求 `deal_id`                                                                                                                                                                                                                      |
+| `valid_until`               | 请求时间（UTC）+ 72 小时，ISO8601。**`PASS` 时**表示"72h 内本结果可被结算层引用"；**`HOLD`/`ESCALATE` 时**表示"72h 内本阻断状态可被引用"；**`NOT_APPLICABLE` 时**表示"72h 内本次无适用检查项结果可被引用"——过期不等于放行，只表示需重查 |
+| `blocked_check_ids`         | 仅含 `result = HOLD` 的 check id（"缺证据暂停付款"路由）                                                                                                                                                                                |
+| `escalated_check_ids`       | 仅含 `result = ESCALATE` 的 check id（"灰区转人工"路由，与上者分开路由）                                                                                                                                                                |
+| `evaluated_check_count`     | `result` 非 `NOT_APPLICABLE` 的检查项数量；`0` 表示本模块规则集未评估这笔交易                                                                                                                                                           |
+| `evidence_hash`             | 同响应根字段                                                                                                                                                                                                                            |
 
 ### 聚合语义
 
@@ -268,6 +269,13 @@ Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
 否则任一 `PASS` → `overall = PASS`。`NOT_APPLICABLE` 为中性；若所有检查均为
 `NOT_APPLICABLE`，overall 也返回 `NOT_APPLICABLE`（`src/engine/engine.ts` 的
 `aggregateCheckStatus`，`ESCALATE > HOLD > PASS > NOT_APPLICABLE` 优先级）。
+
+`overall = NOT_APPLICABLE` 表示该模块规则集对本笔交易无适用检查项，**不构成放行，
+不代表合规通过**；下游应改用其他法域模块或转人工。此时 `blocked_check_ids` 与
+`escalated_check_ids` 为空属预期行为，**不得作为放行信号**。
+
+推荐的下游放行判据是：两个 check id 列表均为空，且 `evaluated_check_count > 0`。
+`evaluated_check_count === 0` 表示本模块规则集未评估这笔交易，**不得放行**。
 
 ### `evidence_hash` 与 `settlement_constraints`
 
@@ -280,12 +288,15 @@ evidence_hash = sha256( canon(version_context) || 0x1F || rules_file_bytes || 0x
 - `rules_file_bytes`：该模块规则文件的原始 UTF-8 字节（不做 JSON 规范化——文件本身
   是版本化产物，字节即身份）；
 - `canon(input)`：`{deal_id, parties, activity, amount_usdc, monthly_volume_usdc?,
-evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符串 NFC）；
+evidence}` 按本项目自有的 JSON 规范化规则处理（不是 RFC 8785 JCS）：对象键和字符串值
+  先做 Unicode NFC 归一化，再按键字典序排列并移除空白；
   `parties` 先按 `(role, country, state)` 排序，数组书写顺序不影响 hash；
   `monthly_volume_usdc` 为 `undefined` 时整个字段省略（不是写入 `null`）；
 - `canon(checks)`：仅 `{id, result, basis}` 数组，按 `id` 排序后规范化——**不含
   `reason`**，修正措辞不改变 hash，`result` 或 `basis` 变化才是实质变更；
 - `0x1F`（Unit Separator）分隔四段，各段自身合法 JSON/UTF-8，消除拼接歧义。
+
+`valid_until` **不被 `evidence_hash` 覆盖**：它由签发时刻派生，不属于判定输入。
 
 该算法是公开规范，采购方或第三方审计者可用相同规则文件、相同请求体、相同 checks
 离线重放验证 `evidence_hash`（实现见 `src/evidence-hash/evidence-hash.ts`，golden
@@ -409,8 +420,8 @@ evidence}` 按 RFC 8785(JCS) 风格规范化（键字典序、无空白、字符
 - `amount_gte` 是**单笔下界判定**：单笔 `amount_usdc ≥ amount_gte` 才触发证据要求；
   法源门槛多为聚合口径（如美国货币兑换 $1,000/人/日累计），单笔 ≥ 门槛可以安全推出
   聚合必然 ≥ 门槛，但**单笔 < 门槛不能推出聚合 < 门槛**，因此规则条件"未触发"时
-  仍输出 `HOLD`（`reason: "单笔未达门槛，聚合情形需采购方自行核实"`），**不输出
-  `PASS`**；
+  仍输出 `HOLD`（`basis: "insufficient_aggregate_data"`，
+  `reason: "单笔未达门槛，聚合情形需采购方自行核实"`），**不输出 `PASS`**；
 - `monthly_volume_gte` 依赖可选字段 `monthly_volume_usdc`：缺失（`undefined` 或
   `null`）→ 相关检查项 `HOLD`，`reason: "无法判定分级，需补交易量数据"`；达到该字段
   但低于门槛 → `NOT_APPLICABLE`，`basis: "deterministic_threshold"`，

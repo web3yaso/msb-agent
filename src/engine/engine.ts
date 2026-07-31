@@ -130,12 +130,11 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
     );
   }
 
-  return createCheck(
-    rule,
-    "PASS",
-    rule.required_evidence.length === 0 ? "deterministic_threshold" : "caller_assertion",
-    "所需证据齐全",
-  );
+  if (rule.required_evidence.length === 0) {
+    return createCheck(rule, "ESCALATE", "manual_review", "规则未定义任何可判定条件，需人工核实");
+  }
+
+  return createCheck(rule, "PASS", "caller_assertion", "所需证据齐全");
 }
 
 function evaluateRule(rule: Rule, input: DealInput): CheckResult {

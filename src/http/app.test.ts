@@ -312,6 +312,7 @@ describe("HTTP app", () => {
     expect(body.maintainer_wallet).toBe(MAINTAINER_WALLET);
     expect(body.royalty_bps).toBe(500);
     expect(body.overall).toBe("PASS");
+    expect(body.settlement_constraints.evaluated_check_count).toBeGreaterThan(0);
     expect(body.settlement_constraints).toMatchObject({
       module: "us-msb",
       module_version: "2026.07.1",
@@ -321,6 +322,33 @@ describe("HTTP app", () => {
       escalated_check_ids: [],
       evidence_hash: body.evidence_hash,
     });
+  });
+
+  it("POST /modules/sg-msb/check 对全不适用交易返回 NOT_APPLICABLE", async () => {
+    const response = await app.request("/modules/sg-msb/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...completeUsInput,
+        deal_id: "sg-check-cashing",
+        parties: [
+          { role: "payer", country: "SG" },
+          { role: "payee", country: "SG" },
+        ],
+        activity: "check_cashing",
+        evidence: {},
+      }),
+    });
+    const body = ModuleResponseSchema.parse(await response.json());
+
+    // 这条用例把“NA 不等于放行”钉成可执行契约。
+    expect(response.status).toBe(200);
+    expect(body.overall).toBe("NOT_APPLICABLE");
+    expect(body.checks.every(({ result }) => result === "NOT_APPLICABLE")).toBe(true);
+    expect(body.checks.every(({ basis }) => basis === "not_applicable")).toBe(true);
+    expect(body.settlement_constraints.blocked_check_ids).toEqual([]);
+    expect(body.settlement_constraints.escalated_check_ids).toEqual([]);
+    expect(body.settlement_constraints.evaluated_check_count).toBe(0);
   });
 
   it("请求 JSON 或 DealInput schema 不合法时返回 400", async () => {

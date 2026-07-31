@@ -27,17 +27,21 @@ export const RuleWhenSchema = z.strictObject({
   monthly_volume_gte: z.number().nonnegative().optional(),
 });
 
-export const RuleSchema = z.strictObject({
-  id: z.string().min(1),
-  when: RuleWhenSchema,
-  required_evidence: z.array(z.string().min(1)),
-  result_if_missing: z.enum(["HOLD", "ESCALATE"]),
-  always_escalate: z.boolean(),
-  source: z.string().min(1),
-  source_url: z.url(),
-  accessed_date: z.iso.date(),
-  note: z.string().min(1),
-});
+export const RuleSchema = z
+  .strictObject({
+    id: z.string().min(1),
+    when: RuleWhenSchema,
+    required_evidence: z.array(z.string().min(1)),
+    result_if_missing: z.enum(["HOLD", "ESCALATE"]),
+    always_escalate: z.boolean(),
+    source: z.string().min(1),
+    source_url: z.url(),
+    accessed_date: z.iso.date(),
+    note: z.string().min(1),
+  })
+  .refine((rule) => rule.always_escalate || rule.required_evidence.length > 0, {
+    message: "规则既无门槛也无证据要求，无法产生有意义的判定",
+  });
 
 export const RulesFileSchema = z.strictObject({
   module: ModuleIdSchema,

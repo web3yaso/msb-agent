@@ -154,6 +154,22 @@ describe("evaluate", () => {
     });
   });
 
+  it("适用规则无证据要求且不强制升级时防御性输出 ESCALATE", () => {
+    const emptyRule: Rule = {
+      ...baseRule,
+      id: "empty-applicable-rule",
+      when: { party_country: "US" },
+      required_evidence: [],
+    };
+    const rules = [emptyRule];
+
+    expect(evaluate(rules, baseInput, encodeRules(rules)).checks[0]).toMatchObject({
+      result: "ESCALATE",
+      basis: "manual_review",
+      reason: "规则未定义任何可判定条件，需人工核实",
+    });
+  });
+
   it("月交易量等于或高于门槛时继续执行证据判定", () => {
     const volumeRule: Rule = {
       ...baseRule,

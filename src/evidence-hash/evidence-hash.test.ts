@@ -97,6 +97,13 @@ describe("canonicalizeChecks", () => {
 });
 
 describe("computeEvidenceHash", () => {
+  it("匹配 scheme 2 固定已知答案向量", () => {
+    // 此向量锁定预映射字节序列，改动预映射必须同步更新此值并说明原因。
+    expect(computeEvidenceHash(rulesFileBytes, input, checks)).toBe(
+      "05635dccaa82c9b18f4a689aeba6663fd2a838717b6f52b64015ea54109e3e84",
+    );
+  });
+
   it("同一输入重复计算得到相同结果", () => {
     const firstHash = computeEvidenceHash(rulesFileBytes, input, checks);
     const secondHash = computeEvidenceHash(rulesFileBytes, input, checks);
@@ -117,6 +124,16 @@ describe("computeEvidenceHash", () => {
 
     expect(changedBasis).not.toBe(baseline);
     expect(changedEngine).not.toBe(baseline);
+  });
+
+  it("hash_scheme_version 改变时 hash 随之改变", () => {
+    const baseline = computeEvidenceHash(rulesFileBytes, input, checks);
+    const changedHashScheme = computeEvidenceHash(rulesFileBytes, input, checks, {
+      engineVersion: ENGINE_VERSION,
+      hashSchemeVersion: "999",
+    });
+
+    expect(changedHashScheme).not.toBe(baseline);
   });
 
   it("默认使用公开的 engine 与 hash scheme 版本", () => {

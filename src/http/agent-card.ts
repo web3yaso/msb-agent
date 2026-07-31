@@ -106,7 +106,7 @@ export function buildAgentCard(input: AgentCardInput): Record<string, unknown> {
         sources: getSources(input.modules[moduleId]),
       })),
       evidence_hash_definition:
-        "sha256(canonical_version_context || rules_file_bytes || canonical_input || checks[{id,result,basis}])",
+        "sha256(canonical_version_context || 0x1F || rules_file_bytes || 0x1F || canonical_input || 0x1F || canonical(checks[{id,result,basis}] sorted by id))",
       no_llm_in_decision_path: true,
       payment_parameters_are_not_covered_by_evidence_hash: true,
     },

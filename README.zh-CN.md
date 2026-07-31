@@ -92,6 +92,8 @@ const response = await gatewayClient.pay(
 }
 ```
 
+`overall = NOT_APPLICABLE` 表示本模块没有适用检查项，不构成放行，也不代表合规通过。
+
 `evidence_hash` 是对版本上下文、规则文件字节、规范化输入、规范化 checks 的
 sha256——任何人都可以用相同的公开规则文件离线重放，确认这些材料和结果未被修改。
 它不证明调用方提交的证据真实。逐字段完整参考见
