@@ -114,7 +114,7 @@ Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选�
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                          | 源码默认 `x402-arc-testnet`（`.env.example` 示例显式写 `off`） |
 | `PORT`                                                                                | HTTP 监听端口                                                                               | `3000`                                                         |
-| `PUBLIC_BASE_URL`                                                                     | 公网 HTTPS 基地址；`off` 模式未设时回落 localhost，付费模式必填                              | 无                                                              |
+| `PUBLIC_BASE_URL`                                                                     | 公网 HTTPS 基地址；`off` 模式未设时回落 localhost，付费模式必填                             | 无                                                             |
 | `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数                                                           | 分别为 `0.800000` / `0.400000` / `0.600000` / `0.200000`       |
 | `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填                     | 占位地址，启用前必须替换                                       |
 | `MODULE_MAINTAINER_WALLET`                                                            | 全局维护者版税收款地址；x402 模式必填，可用四个 `{MODULE}_MAINTAINER_WALLET` 变量按模块覆盖 | `off` 模式回落零地址                                           |
@@ -123,8 +123,8 @@ Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选�
 | `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL；仅 `x402-base-sepolia` 用                                     | 无（该模式下必填）                                             |
 | `CHECK_RULE_LINKS`                                                                    | 设为 `1` 启用规则法源链接存活检查（网络请求）                                               | `0`（跳过）                                                    |
 | `RULES_BASE_REF`                                                                      | 规则版本 CI 校验的 git 对比基准                                                             | `HEAD^`                                                        |
-| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_TRUST_PROXY_HEADER`  | 限流窗口/上限/是否信任代理头（见上文）                                                       | `60000` / `60` / `false`                                      |
-| `ERC8004_IDENTITY_REGISTRY` / `ERC8004_AGENT_ID`                                      | ERC-8004 公开身份信息（见「阶段 1-4」）                                                     | 无                                                              |
+| `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` / `RATE_LIMIT_TRUST_PROXY_HEADER`  | 限流窗口/上限/是否信任代理头（见上文）                                                      | `60000` / `60` / `false`                                       |
+| `ERC8004_IDENTITY_REGISTRY` / `ERC8004_AGENT_ID`                                      | ERC-8004 公开身份信息（见「阶段 1-4」）                                                     | 无                                                             |
 
 ## 本地对 Arc Testnet 的真实链上冒烟
 
@@ -145,8 +145,71 @@ fail-fast；`npm run smoke:arc` 同样受此校验约束。本仓库已跑通一
 `0xfcc78968b336ac103fe577cfd74075309cf70720eb086a7394c28146d83919f7`，支付结算 ID
 `49f19918-632c-4ffe-9869-27be6472ac69`。
 
+### 已知坑：官方公共 RPC 会限流，存款路径必撞（2026-07-31 实测）
+
+Arc Testnet 官方公共节点 `https://rpc.testnet.arc.network` 有较紧的请求配额，
+**跑存款路径时几乎必然撞上**，表现为：
+
+```
+SMOKE PUBLIC FAILED: RPC Request failed.
+Contract Call:
+  function:  allowance(address owner, address spender)
+Details: request limit reached          ← JSON-RPC 错误码 -32011
+```
+
+注意这是 viem 的 `RpcRequestError`（节点正常响应但返回了错误对象），
+**不是** `HttpRequestError`（网络不通）——不要往「端点挂了」的方向排查。
+
+触发条件是**调用密度**，不是调用总量：Gateway 余额低于 `MINIMUM_GATEWAY_BALANCE`
+（1.05 USDC）时脚本进入存款分支，approve 前要读 `allowance`，这段调用比单纯查余额
+密集一个数量级。只查余额的路径基本不会触发。
+
+同一 `eth_call` 连打 15 次的实测结果：
+
+| 端点                                          | 成功 / 失败                  |
+| --------------------------------------------- | ---------------------------- |
+| `https://rpc.testnet.arc.network`（SDK 默认） | 7 / **8**                    |
+| `https://rpc.testnet.arc.io`                  | 11 / 4（表现相近，疑似同源） |
+| `https://arc-testnet.drpc.org`                | **15 / 0**                   |
+| `https://arc-testnet.rpc.thirdweb.com`        | **15 / 0**                   |
+
+**处置**：用 `SMOKE_ARC_RPC_URL` 换到 dRPC 或 thirdweb（两者 chainId 均实测为
+`0x4cef52` = 5042002）：
+
+私钥与 `SMOKE_FORCE_DEPOSIT=1` 的准备方式**完全照 README「Try It Now」那一节**
+（`read -rs` 写入 `.env.local`，不在命令行上敲私钥、用 `>>` 不覆盖已有内容），
+这里不重复。相对那节命令，本处只多一个环境变量：
+
+```bash
+SMOKE_ARC_RPC_URL=https://arc-testnet.drpc.org \
+node --env-file=.env.local --import tsx scripts/smoke-public.ts
+```
+
+两点说明：
+
+- **必须走 `node --env-file=`，不能用 `npm run smoke:public`**：package.json 里那条
+  script 没有 `--env-file`，项目也没有 dotenv，`.env.local` 不会被加载，
+  只会得到「`X402_SMOKE_CLIENT_PRIVATE_KEY` 缺失」这个与限流无关的报错；
+- README 的 `.env.local` 模板里已含 `SMOKE_FORCE_DEPOSIT=1`，**本节场景必须有它**
+  ——否则余额低于门槛时脚本在进入存款分支前就 throw「Gateway 可用余额不足」而退出，
+  走不到会触发限流的那段调用，也就验证不了换端点是否有效
+  （见 `scripts/smoke-public.ts` 的余额门槛分支）。余额充足时该变量不产生任何副作用，
+  可以一直留在文件里。
+
+**次要缓解**：把 `SMOKE_DEPOSIT_USDC` 调大（如 `5`），一次存款够跑好几轮，
+后续运行余额充足会直接跳过存款分支，从根上避开这段密集调用。
+
+本仓库已用 dRPC 跑通一次公网真实付费冒烟：存款交易
+`0x6ac9fa96ecc555c41396e96cddd57bb7c6426acd24356db19c1abc528084c70e`，
+支付结算 ID `f22febf0-8a7a-4649-bc1d-aa9f9f168e7b`，
+`evidence_hash` `55b687d6d79d24602eca450a353a5dc6577367e3927256e1ab13e8213fdf0d05`，
+`overall` 为 `HOLD`。该次冒烟同时验证了响应能通过 `ModuleResponseSchema.parse`，
+即线上实例的三个必填字段齐全：根级的 `engine_version` 与 `hash_scheme_version`、
+以及 `settlement_constraints.evaluated_check_count`。
+
 脚本相关环境变量：`X402_SMOKE_CLIENT_PRIVATE_KEY`（必填，测试钱包私钥）、
-`SMOKE_ARC_RPC_URL`（可选，自定义 RPC）、`SMOKE_MODULE`（可选，默认 `us-msb`）、
+`SMOKE_ARC_RPC_URL`（可选，自定义 RPC；**公共节点限流时必须设置**，见上）、
+`SMOKE_MODULE`（可选，默认 `us-msb`）、
 `SMOKE_PORT`（可选，默认 `4402`）、`SMOKE_DEPOSIT_USDC`（可选，默认 `1.50`）、
 `SMOKE_FORCE_DEPOSIT`（可选，`0`/`1`/`false`/`true`，为真时余额不足自动调用
 `GatewayClient.deposit(...)` 存款并轮询等待到账）。
