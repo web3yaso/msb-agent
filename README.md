@@ -154,6 +154,34 @@ automatically if needed (can take a few minutes). Default module `us-msb`
 costs `0.800000` testnet USDC per call. Prerequisites (Node 20+) and the full
 script reference are in [docs/deploy.md](docs/deploy.md).
 
+## Modules
+
+| Module   | Jurisdiction         | Rules version | Rules | Default price (testnet USDC) |
+| -------- | -------------------- | ------------- | ----- | ---------------------------- |
+| `us-msb` | United States        | 2026.07.1     | 6     | 0.800000                     |
+| `uk-msb` | United Kingdom       | 2026.07.1     | 6     | 0.400000                     |
+| `eu-msb` | European Union (27)  | 2026.07.2     | 9     | 0.600000                     |
+| `sg-msb` | Singapore            | 2026.07.1     | 5     | 0.200000                     |
+| `ae-msb` | United Arab Emirates | 2026.08.1     | 6     | 1.000000                     |
+
+Each module is gated on jurisdiction: a request is accepted only if at least
+one party's `country` falls in the module's jurisdiction (`US` / `GB` / EU
+member states / `SG` / `AE`), otherwise it returns `422` before any payment
+is charged.
+
+**UAE (`ae-msb`) specifics**: rules are sourced from the CBUAE Retail Payment
+Services and Card Schemes Regulation, the Federal Decree-Law No. (10) of 2025
+(AML/CFT/CPF, in force since 2025-10-14), UAE FIU goAML registration, Cabinet
+Resolution No. (134) of 2025 (wire-transfer originator/beneficiary
+information), the VARA VA Transfer and Settlement Services Rulebook, and the
+CBUAE Payment Token Services Regulation Article 12. Note that any AE
+transaction with `activity = "crypto_transfer"` or `"stored_value"` always
+returns `overall = "ESCALATE"`: whether foreign payment tokens (such as USDC)
+may be used for payment inside the UAE is a genuine regulatory gray area under
+PTSR Article 12, and the module deliberately routes it to human review instead
+of guessing. This is by design, not a malfunction — see
+[docs/api.md](docs/api.md) for details.
+
 ## What This Is
 
 This is a reference implementation of the compliance-check modules for the
