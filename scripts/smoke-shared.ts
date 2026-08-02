@@ -12,6 +12,7 @@ export const SMOKE_DEAL_INPUT = {
     { role: "payee", country: "SG" },
     { role: "payee", country: "GB" },
     { role: "payee", country: "DE" },
+    { role: "payee", country: "AE" },
   ],
   activity: "money_transmission",
   amount_usdc: 10_000,

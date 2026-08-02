@@ -9,7 +9,7 @@
     "name": "MSB Compliance Module Service",
     "category": "compliance",
     "tags": ["compliance", "msb", "kyc-aml", "x402", "regtech", "cross-border-payments"],
-    "description": "四法域跨境汇款 MSB 监管合规检查项状态 API；确定性规则引擎，每条规则带公开法源。按次 x402 收费。本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
+    "description": "五法域跨境汇款 MSB 监管合规检查项状态 API；确定性规则引擎，每条规则带公开法源。按次 x402 收费。本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
     "base_url": "https://msb-agent-production-769d.up.railway.app",
     "agent_card_url": "https://msb-agent-production-769d.up.railway.app/.well-known/agent-card.json",
     "discovery_endpoints": ["GET /modules", "GET /modules/{id}/schema"],
@@ -37,6 +37,12 @@
         "price_usdc": "0.200000",
         "input_schema_url": "https://msb-agent-production-769d.up.railway.app/modules/sg-msb/schema",
         "description": "Singapore MSB checks"
+      },
+      {
+        "route": "POST /modules/ae-msb/check",
+        "price_usdc": "1.000000",
+        "input_schema_url": "https://msb-agent-production-769d.up.railway.app/modules/ae-msb/schema",
+        "description": "United Arab Emirates MSB checks (crypto_transfer / stored_value transactions always ESCALATE, see docs/api.md)"
       }
     ]
   },

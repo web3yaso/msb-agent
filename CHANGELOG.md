@@ -7,6 +7,58 @@
 
 ## [Unreleased]
 
+对应设计：`docs/design/2026-08-01-ae-msb-module.md`。
+
+### 新增
+
+- 新增第 5 个法域模块 `ae-msb`（阿联酋，United Arab Emirates），版本 `2026.08.1`，
+  默认价 `1.000000` 测试网 USDC，6 条规则：
+  - `ae-cbuae-rps-license`：CBUAE Retail Payment Services and Card Schemes Regulation
+    （Circular No. 15/2021）在岸零售支付牌照；
+  - `ae-aml-cft-program`：Federal Decree by Law No. (10) of 2025（AML/CFT/CPF）
+    AML/CFT 计划证据（2025-10-14 生效，取代 Federal Decree-Law No. (20) of 2018）；
+  - `ae-goaml-registration`：UAE FIU goAML Portal 可疑交易报告平台注册；
+  - `ae-wire-transfer-information`：Cabinet Resolution No. (134) of 2025（AML 法
+    执行细则）跨境汇款人/收款人信息（FATF R.16 本地化）；
+  - `ae-vasp-license-path`：VARA VA Transfer and Settlement Services Rulebook，
+    虚拟资产转移牌照路径，`result_if_missing: ESCALATE`（多轨监管无法由静态输入
+    判定应落在哪一轨，缺证据即转人工而非扣住）；
+  - `ae-payment-token-restrictions`：CBUAE Payment Token Services Regulation
+    Article 12（Restrictions on Payment Tokens），`always_escalate: true`——
+    **任何 AE + `crypto_transfer` 或 AE + `stored_value` 的交易，`overall` 恒为
+    `ESCALATE`**，这是对"pay-in AED / settle in USDC"灰区的刻意处理，不是缺陷。
+  详见 `docs/api.md` / `docs/api.zh-CN.md` 的对应说明。
+- `GET /modules`、`GET /modules/ae-msb/schema`、`POST /modules/ae-msb/check`、
+  agent card `x-msb.modules` 自动纳入第 5 个模块（由既有 `ModuleIdSchema` 与
+  注册表驱动，无新增路由代码）。
+
+### 修复
+
+- `src/http/app.ts` 的 `isPartyInJurisdiction` 由硬编码三元链改为
+  `MODULE_COUNTRIES: Record<ModuleId, ReadonlySet<string>>` 查表实现。修复一处
+  在新增第 5 个模块时会**静默出错**的既有缺陷：旧实现的 else 分支把非
+  us/uk/eu 模块一律映射到 `{"SG"}`，导致① 真正的 AE 交易被 422 拒收，
+  ② SG 交易会被 `ae-msb` 受理并收费，返回全 `NOT_APPLICABLE`（采购方付费拿到
+  零信息量响应）。修复后 US/GB/EU（27 国）/SG/AE 五个法域的受理集合逐一等价于
+  修复前的行为，不改变既有四模块的受理结果。
+
+### 版本裁决留痕（ae-msb 新增，独立于上一条 CheckStatus 变更的裁决）
+
+- **`ENGINE_VERSION` 保持 `1.0.0`，未 bump。** 本次新增模块唯一的行为性代码改动
+  是上述 `isPartyInJurisdiction` 查表重写，该改动位于 HTTP 法域前置网关、在规则
+  引擎之外，不进入 `checks` 或 `evidence_hash` 的任何输入；`src/engine/engine.ts`
+  与 `src/evidence-hash/evidence-hash.ts` 一个字符未改。豁免依据（实证）：
+  `src/golden/citely-demo.test.ts` 中 `us-msb` / `uk-msb` / `eu-msb` / `sg-msb`
+  四个既有 `evidence_hash` 常量与 `__snapshots__/citely-demo.test.ts.snap` 中对应
+  四份快照**逐字节未变**（新增内容仅为 `ae-msb` 的追加条目）。`hash_scheme_version`
+  同样保持 `"2"`，预映射字节序列未动。
+- golden 测试新增 `AE_DEMO_INPUT`（Citely Demo 输入追加 `{role:"payee",
+  country:"AE"}` 变体，`deal_id: "citely-demo-10000-usdc-ae"`），而非直接扩展
+  共享 `CITELY_DEMO_INPUT`，正是为了保住上一条"四个既有 hash 未变"的实证——
+  后者会一次性改掉全部既有哈希，使"引擎语义未变"无法自证。
+- `ae-msb` 的 `evidence_hash` 已连续三次运行验证一致，钉为
+  `48fe82dd6b6dfe2dd1191638cb6270e548cb361cceefd1674c4bb623836be686`。
+
 ### 破坏性变更
 
 - `ModuleResponse` 新增必填字段 `engine_version` / `hash_scheme_version`；使用严格

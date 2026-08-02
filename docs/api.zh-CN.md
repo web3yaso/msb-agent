@@ -25,6 +25,16 @@ zod 定义为准；本文示例均来自可通过 `npm test` 复现的实际请�
 | `uk-msb` | 英国                               | 任一 party `country = "GB"`     |
 | `eu-msb` | 欧盟（含德/法/荷成员国专项检查项） | 任一 party 落在 27 个欧盟成员国 |
 | `sg-msb` | 新加坡                             | 任一 party `country = "SG"`     |
+| `ae-msb` | 阿联酋                             | 任一 party `country = "AE"`     |
+
+> **AE + crypto/stored_value 交易恒为 `ESCALATE`**：`ae-msb` 模块下，任何涉及 AE
+> 交易方且 `activity = "crypto_transfer"` 或 `activity = "stored_value"` 的交易，
+> 无论证据是否齐全，`overall` 恒为 `ESCALATE`。原因是 `ae-payment-token-restrictions`
+> 规则（`always_escalate: true`；法源：CBUAE Payment Token Services Regulation
+> Article 12——Restrictions on Payment Tokens）把"境内以 AED 收款、以 USDC 结算"这一
+> 灰区交由人工核实，不做猜测判定。这是"规则表达不了就转人工"这一引擎不变量的正常
+> 表现，**不是服务故障**；采购方不应把该模块/活动组合下持续出现的 `ESCALATE`
+> 误判为报错。
 
 **不做**：规则自动更新、多语言输出、KYB/钱包数据采购（属 Citely F4，另一供应商）、
 Jurisdiction Review（属 Citely F5）、真实法律意见。
@@ -40,13 +50,13 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 | GET  | `/`                                    | 否         | 服务目录 JSON（名称、描述、端点映射、仓库地址） |
 | GET  | `/healthz`                             | 否         | 部署平台健康检查；唯一豁免限流的端点            |
 | GET  | `/static/agent-icon.png`               | 否         | agent card 图标图片                             |
-| GET  | `/modules`                             | 否         | 列出 4 个模块的定价、收款地址、法源、版本       |
+| GET  | `/modules`                             | 否         | 列出 5 个模块的定价、收款地址、法源、版本       |
 | GET  | `/modules/:id/schema`                  | 否         | 该模块 evidence 字段的 JSON Schema              |
 | GET  | `/.well-known/agent-card.json`         | 否         | ERC-8004 registration-v1 agent card             |
 | GET  | `/.well-known/agent-registration.json` | 否         | 已注册身份的域名控制证明；未注册时 404          |
 | POST | `/modules/:id/check`                   | 是（x402） | 提交交易信息，返回确定性检查结果                |
 
-`:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`（`ModuleIdSchema`）。
+`:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` \| `ae-msb`（`ModuleIdSchema`）。
 
 免费发现路径以及付费检查在支付前的校验路径按客户端 IP 固定窗口限流，默认每分钟 60 次。
 超限返回 HTTP 429，响应含 `error=rate_limit_exceeded`、可读 `message` 与
@@ -74,7 +84,7 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 | `x402-base-sepolia` | 兜底：Arc facilitator 不稳定时的降级演示      | Base Sepolia，`eip155:84532`  |
 | `x402-arc-testnet`  | **主目标**：Circle hosted testnet facilitator | Arc Testnet，`eip155:5042002` |
 
-四模块差异化默认定价（可用对应 `{MODULE}_PRICE_USDC` 环境变量覆盖）：
+五模块差异化默认定价（可用对应 `{MODULE}_PRICE_USDC` 环境变量覆盖）：
 
 | 模块     | 每次调用价格（测试网 USDC） |
 | -------- | --------------------------: |
@@ -82,9 +92,10 @@ Base URL：本地开发默认 `http://localhost:3000`（`PORT` 可配）。当�
 | `eu-msb` |                  `0.600000` |
 | `uk-msb` |                  `0.400000` |
 | `sg-msb` |                  `0.200000` |
+| `ae-msb` |                  `1.000000` |
 
 价格合法范围为 `0 < price <= 100`，启动时校验并规范化为六位小数；非法值直接拒绝
-启动，防止小数点错位造成计费事故。收款地址通过四个 `{MODULE}_PAY_TO` 环境变量
+启动，防止小数点错位造成计费事故。收款地址通过五个 `{MODULE}_PAY_TO` 环境变量
 配置——是公开信息，会出现在 `GET /modules` 响应里，但从不写入代码或文档。
 
 Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
@@ -162,8 +173,9 @@ Arc Testnet 的结算方案是 Circle Gateway 的 `GatewayWalletBatched`
 
 字段语义：
 
-- `jurisdiction`：`United States` / `United Kingdom` / `European Union` / `Singapore`
-  （固定字符串，见 `src/http/constants.ts` 的 `MODULE_JURISDICTIONS`）；
+- `jurisdiction`：`United States` / `United Kingdom` / `European Union` / `Singapore` /
+  `United Arab Emirates`（固定字符串，见 `src/http/constants.ts` 的
+  `MODULE_JURISDICTIONS`）；
 - `price_usdc`：来自 `{MODULE}_PRICE_USDC` 或模块源码默认价，并统一规范化为六位小数；
   `pay_to` 直接读自 `{MODULE}_PAY_TO`。两者是公开信息，**不是秘密**；`pay_to`
   未配置时返回空字符串；
@@ -438,7 +450,7 @@ evidence}` 按本项目自有的 JSON 规范化规则处理（不是 RFC 8785 JC
 | `200`  | 校验通过、法域受理、（付费模式下）支付成功                                                                                                                          | 见上文 `ModuleResponseSchema`                                                                                                                                          |
 | `400`  | 请求体不是合法 JSON，或不满足 `DealInputSchema`（**不收费**，在 x402 中间件之前完成校验）                                                                           | `{ "error": "invalid_request", "issues": [{ "path": [...], "message": "..." }], "disclaimer": "..." }`                                                                 |
 | `402`  | 仅 `PAYMENT_MODE = x402-base-sepolia` / `x402-arc-testnet` 时，请求未携带有效支付凭证                                                                               | x402 标准 `PAYMENT-REQUIRED` 响应头 + 402 payload（由 `@x402/hono` 生成，非本服务自定义 JSON）                                                                         |
-| `404`  | `:id` 不是 `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`                                                                                                             | `{ "error": "module_not_found", ... }`                                                                                                                                 |
+| `404`  | `:id` 不是 `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` \| `ae-msb`                                                                                                  | `{ "error": "module_not_found", ... }`                                                                                                                                 |
 | `413`  | 请求体超过 256KB                                                                                                                                                    | `{ "error": "request_too_large", "message": "请求体不得超过 256KB", "disclaimer": "..." }`                                                                             |
 | `422`  | Schema 校验通过，但**全部** party 均不在模块法域内（法域受理边界：**任一** party 在法域内即受理，422 只在全部 party 都不在时触发，避免用 422 绕过 ESCALATE 不变量） | `{ "error": "jurisdiction_not_applicable", "message": "全部交易方均不在 <法域> 模块适用法域内", "disclaimer": "..." }`                                                 |
 | `500`  | 支付结算成功后引擎求值/序列化抛异常                                                                                                                                 | `{ "error": "internal_error", "message": "检查执行失败，可使用同一支付凭证重试", "payment_credential_id": "<sha256(凭证)>"（若已收到支付凭证）, "disclaimer": "..." }` |

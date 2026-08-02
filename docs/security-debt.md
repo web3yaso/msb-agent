@@ -85,3 +85,25 @@
 - [ ] `x402-*` 模式上线前，人工确认 `MODULE_MAINTAINER_WALLET`
       （及 `US_MSB_MAINTAINER_WALLET` 等按模块覆盖项，若使用）已替换为真实维护者钱包，
       非 `.env.example` 中的零地址占位值。
+
+## 2026-08-01 ae-msb 安全审计遗留（Medium/Low，已随 PR 放行）
+
+报告全文：`docs/design/reviews/sec-ae-msb-20260801-2250.md`（design 目录不入库）。
+
+- [ ] **M1（上线前必须完成，部分完成）** `docs/deploy.md` 已于 2026-08-01 doc-writer
+      同步补齐 `AE_MSB_PRICE_USDC` / `AE_MSB_PAY_TO` / `AE_MSB_MAINTAINER_WALLET` /
+      `AE_MSB_ROYALTY_BPS` 的环境变量表条目及"先配置再发布"的部署顺序提示。
+      **`.env.example` 仍未同步**——doc-writer 对该文件的 Read/Edit/Bash 全部被沙箱权限
+      拒绝（deny rule 覆盖该文件路径，无法确认现状或写入），需人工补一次性编辑，
+      具体待补内容见 `docs/design/2026-08-01-ae-msb-module.md` 的「已知缺口」小节。
+      任一 x402 模式下缺 `AE_MSB_PAY_TO` 会让**整个服务**启动失败（fail-closed，非收款风险）。
+      部署顺序：先配环境变量，再发布本次代码。
+- [ ] **L2** `src/http/constants.ts` 的 `MODULE_COUNTRIES["eu-msb"]` 直接引用可变的
+      `EU_MEMBER_COUNTRIES`（`ReadonlySet` 只是类型约束），运行时可被 `.add()` 扩大受理法域。
+      建议 `Object.freeze` 或改存副本。
+- [ ] **L3** 付费墙 402 回归测试只覆盖 `us-msb`；建议加
+      `it.each(ModuleIdSchema.options)` 断言"每个模块未付费必 402"，防止将来某模块端点意外免费。
+- [ ] **L4** 本地未跟踪文件 `.env.local` / `.env.smoke` 各含 2 处 gitleaks 命中（已 gitignore、
+      历史扫描无泄漏）。勿 `git add -f`，建议将私密配置移出仓库目录。
+- [ ] **L5** 存量依赖告警：`@hono/node-server <2.0.5`（GHSA-frvp-7c67-39w9，Windows serve-static
+      路径穿越）。本仓未使用 serve-static，路径不可达；升级 2.x 为破坏性变更，需单独设计。

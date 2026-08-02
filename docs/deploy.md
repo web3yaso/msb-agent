@@ -46,9 +46,11 @@ npm test
 1. 引擎单元测试：每条规则至少一个触发/不触发用例 + 确定性测试（同输入两次求值
    `checks`/`evidence_hash` 完全一致）；
 2. golden 测试（`src/golden/citely-demo.test.ts`）：Citely Demo 场景（美国 Client →
-   新加坡 Marketplace → 英/德服务商，名义 10,000 USDC）四个模块的固定输入输出快照，
-   含 `evidence_hash` 跨运行一致性断言与 `disclaimer` 存在性断言；规则 version bump
-   后必须重新生成快照并人工 review diff；
+   新加坡 Marketplace → 英/德服务商，名义 10,000 USDC）覆盖五个模块的固定输入输出
+   快照——`us-msb`/`uk-msb`/`eu-msb`/`sg-msb` 共用同一份输入，`ae-msb` 用追加了
+   AE payee 的独立变体（`AE_DEMO_INPUT`），保证既有四模块的 `evidence_hash` 与快照
+   逐字节未变；含 `evidence_hash` 跨运行一致性断言与 `disclaimer` 存在性断言；
+   规则 version bump 后必须重新生成快照并人工 review diff；
 3. 集成测试：x402 402 → 支付 → 200 全流程（`base-sepolia` 走单元测试常态覆盖，
    `arc-testnet` 走 `npm run smoke:arc` 真实链上冒烟——见下方「本地对 Arc Testnet
    的真实链上冒烟」——不进 `npm test` 常规流程）。
@@ -69,6 +71,13 @@ CHECK_RULE_LINKS=1 npm run check:links   # 法源链接存活检查；未设置�
 3. 首次部署后生成 Railway 分配的 `*.up.railway.app` HTTPS 子域名。
 4. 将 `PUBLIC_BASE_URL` 设置为该 Railway URL 后重新部署。
 5. Railway 健康检查使用 `GET /healthz`；该专用端点豁免应用层限流。
+
+> **升级到 5 模块（新增 `ae-msb`）时的部署顺序**：任一 x402 模式下，`loadPaymentConfig`
+> 对每个模块的 `{MODULE}_PAY_TO` 都会 `requireEnvironmentValue` 校验，因此
+> **`AE_MSB_PAY_TO` 缺失会让整个服务（含既有四模块）启动失败**，不是新模块单独不可用。
+> 必须**先在 Railway 环境变量里配好 `AE_MSB_PAY_TO`（以及可选的
+> `AE_MSB_PRICE_USDC` / `AE_MSB_MAINTAINER_WALLET` / `AE_MSB_ROYALTY_BPS`），再发布本次
+> 代码**，否则线上服务直接不可用。
 
 依赖安装必须走 `npm ci`（按 package-lock.json 的 integrity 校验安装，esbuild 等带
 install script 的依赖由锁文件背书；Railway/Railpack 默认即 `npm ci`，勿改用忽略锁文件的方式）。
@@ -91,7 +100,7 @@ Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选�
 
 ## 环境变量
 
-服务运行需要 `PUBLIC_BASE_URL`、`PAYMENT_MODE`、四个 `{MODULE}_PAY_TO`、四模块价格
+服务运行需要 `PUBLIC_BASE_URL`、`PAYMENT_MODE`、五个 `{MODULE}_PAY_TO`、五模块价格
 （可使用默认值）、`MODULE_MAINTAINER_WALLET`、`MODULE_ROYALTY_BPS` 和
 `X402_ARC_TESTNET_FACILITATOR_URL`。身份公开信息为 `ERC8004_AGENT_ID` 与
 `ERC8004_IDENTITY_REGISTRY`。限流可用 `RATE_LIMIT_WINDOW_MS`、
@@ -115,10 +124,10 @@ Node 版本要求 `>=20`（package.json `engines` 已声明，Railway 据此选�
 | `PAYMENT_MODE`                                                                        | `off` \| `x402-base-sepolia` \| `x402-arc-testnet`                                          | 源码默认 `x402-arc-testnet`（`.env.example` 示例显式写 `off`） |
 | `PORT`                                                                                | HTTP 监听端口                                                                               | `3000`                                                         |
 | `PUBLIC_BASE_URL`                                                                     | 公网 HTTPS 基地址；`off` 模式未设时回落 localhost，付费模式必填                             | 无                                                             |
-| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数                                                           | 分别为 `0.800000` / `0.400000` / `0.600000` / `0.200000`       |
-| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO`                 | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填                     | 占位地址，启用前必须替换                                       |
-| `MODULE_MAINTAINER_WALLET`                                                            | 全局维护者版税收款地址；x402 模式必填，可用四个 `{MODULE}_MAINTAINER_WALLET` 变量按模块覆盖 | `off` 模式回落零地址                                           |
-| `MODULE_ROYALTY_BPS`                                                                  | 全局版税基点（0–10000 整数），可用四个 `{MODULE}_ROYALTY_BPS` 变量按模块覆盖                | `0`                                                            |
+| `US_MSB_PRICE_USDC` / `UK_MSB_PRICE_USDC` / `EU_MSB_PRICE_USDC` / `SG_MSB_PRICE_USDC` / `AE_MSB_PRICE_USDC` | 每模块单次调用价格，最多 6 位小数                                                           | 分别为 `0.800000` / `0.400000` / `0.600000` / `0.200000` / `1.000000` |
+| `US_MSB_PAY_TO` / `UK_MSB_PAY_TO` / `EU_MSB_PAY_TO` / `SG_MSB_PAY_TO` / `AE_MSB_PAY_TO` | 每模块收款地址（`0x` + 40 位十六进制），`off` 模式不校验，x402 模式必填                     | 占位地址，启用前必须替换                                       |
+| `MODULE_MAINTAINER_WALLET`                                                            | 全局维护者版税收款地址；x402 模式必填，可用五个 `{MODULE}_MAINTAINER_WALLET` 变量（含 `AE_MSB_MAINTAINER_WALLET`）按模块覆盖 | `off` 模式回落零地址                                           |
+| `MODULE_ROYALTY_BPS`                                                                  | 全局版税基点（0–10000 整数），可用五个 `{MODULE}_ROYALTY_BPS` 变量（含 `AE_MSB_ROYALTY_BPS`）按模块覆盖 | `0`                                                            |
 | `X402_ARC_TESTNET_FACILITATOR_URL`                                                    | Circle Arc Testnet hosted facilitator URL；仅 `x402-arc-testnet` 用                         | 无（该模式下必填）                                             |
 | `X402_BASE_SEPOLIA_FACILITATOR_URL`                                                   | Base Sepolia facilitator URL；仅 `x402-base-sepolia` 用                                     | 无（该模式下必填）                                             |
 | `CHECK_RULE_LINKS`                                                                    | 设为 `1` 启用规则法源链接存活检查（网络请求）                                               | `0`（跳过）                                                    |
@@ -246,4 +255,4 @@ token URI、agent card registration 和免责声明四项全部通过；验证�
 - 定期检查 `/.well-known/agent-card.json` 与链上 token URI 一致。
 - 注册钱包离线保管；仅需要更新 URI 时补充少量 Arc Testnet USDC。
 - 测试网 USDC 水龙头：`https://faucet.circle.com`。
-- 部署回滚到上一稳定 Railway deployment 后，重新检查 agent card URL 和四模块发现端点。
+- 部署回滚到上一稳定 Railway deployment 后，重新检查 agent card URL 和五模块发现端点。

@@ -5,7 +5,7 @@ export const DISCLAIMER =
 
 export const AGENT_NAME = "MSB Compliance Module Service";
 export const AGENT_SHORT_DESCRIPTION =
-  "四法域（US / UK / EU / SG）跨境汇款 MSB 监管合规检查项状态 API：确定性规则引擎，" +
+  "五法域（US / UK / EU / SG / AE）跨境汇款 MSB 监管合规检查项状态 API：确定性规则引擎，" +
   "每条规则带法源引用，按次 x402 收费（Arc Testnet USDC）。" +
   DISCLAIMER;
 export const AGENT_CATEGORY = "compliance";
@@ -52,11 +52,20 @@ export const EU_MEMBER_COUNTRIES = new Set([
   "SE",
 ]);
 
+export const MODULE_COUNTRIES: Record<ModuleId, ReadonlySet<string>> = {
+  "us-msb": new Set(["US"]),
+  "uk-msb": new Set(["GB"]),
+  "eu-msb": EU_MEMBER_COUNTRIES,
+  "sg-msb": new Set(["SG"]),
+  "ae-msb": new Set(["AE"]),
+};
+
 export const MODULE_JURISDICTIONS: Record<ModuleId, string> = {
   "us-msb": "United States",
   "uk-msb": "United Kingdom",
   "eu-msb": "European Union",
   "sg-msb": "Singapore",
+  "ae-msb": "United Arab Emirates",
 };
 
 export const MODULE_PAY_TO_ENV: Record<ModuleId, string> = {
@@ -64,6 +73,7 @@ export const MODULE_PAY_TO_ENV: Record<ModuleId, string> = {
   "uk-msb": "UK_MSB_PAY_TO",
   "eu-msb": "EU_MSB_PAY_TO",
   "sg-msb": "SG_MSB_PAY_TO",
+  "ae-msb": "AE_MSB_PAY_TO",
 };
 
 export const MODULE_PRICE_ENV: Record<ModuleId, string> = {
@@ -71,6 +81,7 @@ export const MODULE_PRICE_ENV: Record<ModuleId, string> = {
   "uk-msb": "UK_MSB_PRICE_USDC",
   "eu-msb": "EU_MSB_PRICE_USDC",
   "sg-msb": "SG_MSB_PRICE_USDC",
+  "ae-msb": "AE_MSB_PRICE_USDC",
 };
 
 export const MODULE_MAINTAINER_WALLET_ENV: Record<ModuleId, string> = {
@@ -78,6 +89,7 @@ export const MODULE_MAINTAINER_WALLET_ENV: Record<ModuleId, string> = {
   "uk-msb": "UK_MSB_MAINTAINER_WALLET",
   "eu-msb": "EU_MSB_MAINTAINER_WALLET",
   "sg-msb": "SG_MSB_MAINTAINER_WALLET",
+  "ae-msb": "AE_MSB_MAINTAINER_WALLET",
 };
 
 export const MODULE_ROYALTY_BPS_ENV: Record<ModuleId, string> = {
@@ -85,6 +97,7 @@ export const MODULE_ROYALTY_BPS_ENV: Record<ModuleId, string> = {
   "uk-msb": "UK_MSB_ROYALTY_BPS",
   "eu-msb": "EU_MSB_ROYALTY_BPS",
   "sg-msb": "SG_MSB_ROYALTY_BPS",
+  "ae-msb": "AE_MSB_ROYALTY_BPS",
 };
 
 export const MODULE_DEFAULT_PRICE_USDC: Record<ModuleId, string> = {
@@ -92,4 +105,5 @@ export const MODULE_DEFAULT_PRICE_USDC: Record<ModuleId, string> = {
   "uk-msb": "0.400000",
   "eu-msb": "0.600000",
   "sg-msb": "0.200000",
+  "ae-msb": "1.000000",
 };

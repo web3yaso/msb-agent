@@ -1,5 +1,79 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Citely Demo golden responses > ae-msb 的完整 ModuleResponse 匹配 golden 快照 1`] = `
+{
+  "checks": [
+    {
+      "basis": "missing_evidence",
+      "id": "ae-cbuae-rps-license",
+      "reason": "缺少所需证据：cbuae_rps_license",
+      "result": "HOLD",
+      "source": "CBUAE Retail Payment Services and Card Schemes Regulation (Circular No. 15/2021)",
+    },
+    {
+      "basis": "missing_evidence",
+      "id": "ae-aml-cft-program",
+      "reason": "缺少所需证据：aml_cft_program",
+      "result": "HOLD",
+      "source": "Federal Decree by Law No. (10) of 2025 (AML/CFT/CPF)",
+    },
+    {
+      "basis": "missing_evidence",
+      "id": "ae-goaml-registration",
+      "reason": "缺少所需证据：goaml_registration",
+      "result": "HOLD",
+      "source": "UAE FIU goAML Portal",
+    },
+    {
+      "basis": "missing_evidence",
+      "id": "ae-wire-transfer-information",
+      "reason": "缺少所需证据：originator_beneficiary_information",
+      "result": "HOLD",
+      "source": "Cabinet Resolution No. (134) of 2025 (Executive Regulations of the AML Law)",
+    },
+    {
+      "basis": "not_applicable",
+      "id": "ae-vasp-license-path",
+      "reason": "规则条件未触发",
+      "result": "NOT_APPLICABLE",
+      "source": "VARA VA Transfer and Settlement Services Rulebook",
+    },
+    {
+      "basis": "not_applicable",
+      "id": "ae-payment-token-restrictions",
+      "reason": "规则条件未触发",
+      "result": "NOT_APPLICABLE",
+      "source": "CBUAE Payment Token Services Regulation, Article (12): Restrictions on Payment Tokens",
+    },
+  ],
+  "disclaimer": "本 Module 为基于公开法源整理的 Demo 版本，输出为检查项状态，不构成法律意见。",
+  "engine_version": "1.0.0",
+  "evidence_hash": "48fe82dd6b6dfe2dd1191638cb6270e548cb361cceefd1674c4bb623836be686",
+  "hash_scheme_version": "2",
+  "maintainer_wallet": "0x5555555555555555555555555555555555555555",
+  "module": "ae-msb",
+  "overall": "HOLD",
+  "royalty_bps": 500,
+  "settlement_constraints": {
+    "blocked_check_ids": [
+      "ae-cbuae-rps-license",
+      "ae-aml-cft-program",
+      "ae-goaml-registration",
+      "ae-wire-transfer-information",
+    ],
+    "deal_id": "citely-demo-10000-usdc-ae",
+    "escalated_check_ids": [],
+    "evaluated_check_count": 4,
+    "evidence_hash": "48fe82dd6b6dfe2dd1191638cb6270e548cb361cceefd1674c4bb623836be686",
+    "module": "ae-msb",
+    "module_version": "2026.08.1",
+    "valid_until": "2026-07-27T12:00:00.000Z",
+  },
+  "updated_at": "2026-08-01T00:00:00Z",
+  "version": "2026.08.1",
+}
+`;
+
 exports[`Citely Demo golden responses > eu-msb 的完整 ModuleResponse 匹配 golden 快照 1`] = `
 {
   "checks": [

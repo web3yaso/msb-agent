@@ -16,6 +16,7 @@ const RULE_FILE_URLS: Record<ModuleId, URL> = {
   "uk-msb": new URL("../rules/uk-msb.json", import.meta.url),
   "eu-msb": new URL("../rules/eu-msb.json", import.meta.url),
   "sg-msb": new URL("../rules/sg-msb.json", import.meta.url),
+  "ae-msb": new URL("../rules/ae-msb.json", import.meta.url),
 };
 
 export interface LoadedModule {
@@ -51,7 +52,7 @@ async function loadModule(moduleId: ModuleId): Promise<LoadedModule> {
 }
 
 /**
- * 一次性加载并校验四个法域的版本化规则文件。
+ * 一次性加载并校验五个法域的版本化规则文件。
  */
 export async function loadModules(): Promise<Record<ModuleId, LoadedModule>> {
   const moduleIds = Object.keys(RULE_FILE_URLS) as ModuleId[];

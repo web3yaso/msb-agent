@@ -29,7 +29,7 @@ import { buildAgentCard, buildAgentRegistration } from "./agent-card.js";
 import {
   AGENT_NAME,
   DISCLAIMER,
-  EU_MEMBER_COUNTRIES,
+  MODULE_COUNTRIES,
   MODULE_JURISDICTIONS,
   MODULE_PAY_TO_ENV,
 } from "./constants.js";
@@ -53,11 +53,7 @@ export interface CreateAppOptions {
 }
 
 function isPartyInJurisdiction(moduleId: ModuleId, input: DealInput): boolean {
-  const acceptedCountries =
-    moduleId === "eu-msb"
-      ? EU_MEMBER_COUNTRIES
-      : new Set([moduleId === "us-msb" ? "US" : moduleId === "uk-msb" ? "GB" : "SG"]);
-
+  const acceptedCountries = MODULE_COUNTRIES[moduleId];
   return input.parties.some(({ country }) => acceptedCountries.has(country));
 }
 

@@ -29,7 +29,7 @@ export const EngineVersionSchema = z.string().regex(/^\d+\.\d+\.\d+$/);
 
 export const EvidenceHashSchemeVersionSchema = z.string().regex(/^\d+$/);
 
-export const ModuleIdSchema = z.enum(["us-msb", "uk-msb", "eu-msb", "sg-msb"]);
+export const ModuleIdSchema = z.enum(["us-msb", "uk-msb", "eu-msb", "sg-msb", "ae-msb"]);
 
 export const PartyRoleSchema = z.enum(["payer", "payee"]);
 

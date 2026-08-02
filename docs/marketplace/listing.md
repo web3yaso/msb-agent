@@ -4,17 +4,17 @@
 
 ## 中文描述
 
-MSB Compliance Module Service 为 US、UK、EU、SG 四法域提供跨境汇款监管检查项状态。
+MSB Compliance Module Service 为 US、UK、EU、SG、AE 五法域提供跨境汇款监管检查项状态。
 服务使用确定性规则引擎，每条规则包含公开法源引用，不在判定回路中使用 LLM。调用方通过
 x402 使用 Arc Testnet USDC 按次支付。输出是检查项状态，不构成法律意见。
 
 ## English description
 
 MSB Compliance Module Service provides regulatory check-item statuses for cross-border money
-transmission across the US, UK, EU, and Singapore. Its deterministic rule engine cites a public
-legal source for every rule and uses no LLM in the decision path. Calls are paid per request via
-x402 in Arc Testnet USDC. Output is a check-item status compiled from public legal sources and
-does not constitute legal advice.
+transmission across the US, UK, EU, Singapore, and the UAE. Its deterministic rule engine cites a
+public legal source for every rule and uses no LLM in the decision path. Calls are paid per
+request via x402 in Arc Testnet USDC. Output is a check-item status compiled from public legal
+sources and does not constitute legal advice.
 
 ## 表单字段
 

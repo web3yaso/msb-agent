@@ -45,7 +45,7 @@ describe("agent card", () => {
     });
   });
 
-  it("四模块元数据、价格和法源完整", () => {
+  it("五模块元数据、价格和法源完整", () => {
     const extension = buildAgentCard(input)["x-msb"] as {
       modules: {
         id: ModuleId;
@@ -54,7 +54,7 @@ describe("agent card", () => {
         version: string;
       }[];
     };
-    expect(extension.modules).toHaveLength(4);
+    expect(extension.modules).toHaveLength(5);
     for (const module of extension.modules) {
       expect(module.price_usdc).toMatch(/^\d+\.\d{6}$/);
       expect(module.sources.length).toBeGreaterThan(0);

@@ -12,6 +12,7 @@ const royaltyConfig = {
   "uk-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
   "eu-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
   "sg-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
+  "ae-msb": { maintainerWallet: PAY_TO, royaltyBps: 500 },
 } as const;
 const paymentConfig: PaymentConfig = {
   facilitatorUrl: "https://facilitator.example.test",

@@ -3,8 +3,8 @@
 English | [简体中文](README.zh-CN.md)
 
 A deterministic, pay-per-call API that checks cross-border money-transmission
-activity against MSB regulatory requirements for four jurisdictions (US / UK /
-EU / Singapore), billed per call in testnet USDC via the
+activity against MSB regulatory requirements for five jurisdictions (US / UK /
+EU / Singapore / UAE), billed per call in testnet USDC via the
 [x402](https://www.x402.org/) protocol on Circle Arc Testnet.
 
 > **Disclaimer**: this service's output is a check-item status compiled from
@@ -24,8 +24,8 @@ Live instance: **<https://msb-agent-production-769d.up.railway.app>**
 curl https://msb-agent-production-769d.up.railway.app/modules
 ```
 
-Returns the four modules (`us-msb`, `uk-msb`, `eu-msb`, `sg-msb`), their
-pricing, payee addresses, legal sources, and `input_schema_url`. You can also
+Returns the five modules (`us-msb`, `uk-msb`, `eu-msb`, `sg-msb`, `ae-msb`),
+their pricing, payee addresses, legal sources, and `input_schema_url`. You can also
 discover this service through its
 [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) identity: `GET
 /.well-known/agent-card.json` is registered on Arc Testnet's Identity

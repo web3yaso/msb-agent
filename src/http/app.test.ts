@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { ModuleResponseSchema } from "../schemas/index.js";
+import { ModuleIdSchema, ModuleResponseSchema } from "../schemas/index.js";
 import { createApp } from "./app.js";
-import { DISCLAIMER, EU_MEMBER_COUNTRIES } from "./constants.js";
+import { DISCLAIMER, EU_MEMBER_COUNTRIES, MODULE_COUNTRIES } from "./constants.js";
 
 interface ErrorResponse {
   error: string;
@@ -16,6 +16,7 @@ interface DiscoveryResponse {
     pay_to: string;
     price_usdc: string;
     input_schema_url: string;
+    sources: { source: string; source_url: string; accessed_date: string }[];
   }[];
 }
 
@@ -60,13 +61,13 @@ describe("HTTP app", () => {
     vi.unstubAllEnvs();
   });
 
-  it("GET /modules 返回四个模块、发现字段和免责声明", async () => {
+  it("GET /modules 返回五个模块、发现字段和免责声明", async () => {
     const response = await app.request("/modules");
     const body = (await response.json()) as DiscoveryResponse;
 
     expect(response.status).toBe(200);
     expect(body.disclaimer).toBe(DISCLAIMER);
-    expect(body.modules).toHaveLength(4);
+    expect(body.modules).toHaveLength(5);
     expect(body.modules).toContainEqual(
       expect.objectContaining({
         module: "us-msb",
@@ -75,6 +76,11 @@ describe("HTTP app", () => {
         input_schema_url: "/modules/us-msb/schema",
       }),
     );
+    const aeModule = body.modules.find(({ module }) => module === "ae-msb");
+    expect(aeModule?.sources.length).toBeGreaterThan(0);
+    expect(typeof aeModule?.sources[0]?.source).toBe("string");
+    expect(typeof aeModule?.sources[0]?.source_url).toBe("string");
+    expect(typeof aeModule?.sources[0]?.accessed_date).toBe("string");
   });
 
   it("GET / 返回服务目录和免责声明", async () => {
@@ -271,6 +277,7 @@ describe("HTTP app", () => {
         "uk-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
         "eu-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
         "sg-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
+        "ae-msb": { maintainerWallet: MAINTAINER_WALLET, royaltyBps: 500 },
       },
     });
     const otherWallet = "0x4444444444444444444444444444444444444444";
@@ -281,6 +288,7 @@ describe("HTTP app", () => {
         "uk-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
         "eu-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
         "sg-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
+        "ae-msb": { maintainerWallet: otherWallet, royaltyBps: 1000 },
       },
     });
     const request = () => ({
@@ -424,6 +432,7 @@ describe("HTTP app", () => {
     ["uk-msb", "US"],
     ["sg-msb", "US"],
     ["eu-msb", "US"],
+    ["ae-msb", "US"],
   ])("%s 的全部 party 均在法域外时返回 422", async (moduleId, country) => {
     const response = await app.request(`/modules/${moduleId}/check`, {
       method: "POST",
@@ -440,6 +449,36 @@ describe("HTTP app", () => {
     expect(body.disclaimer).toBe(DISCLAIMER);
     expect(body).not.toHaveProperty("maintainer_wallet");
     expect(body).not.toHaveProperty("royalty_bps");
+  });
+
+  it("ae-msb 受理 AE party 并对 SG-only 交易返回 422", async () => {
+    const request = (country: string) => ({
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...completeUsInput,
+        deal_id: `ae-${country.toLowerCase()}`,
+        parties: [{ role: "payer", country }],
+      }),
+    });
+
+    const acceptedResponse = await app.request("/modules/ae-msb/check", request("AE"));
+    const rejectedResponse = await app.request("/modules/ae-msb/check", request("SG"));
+
+    expect(acceptedResponse.status).toBe(200);
+    expect(ModuleResponseSchema.parse(await acceptedResponse.json()).module).toBe("ae-msb");
+    expect(rejectedResponse.status).toBe(422);
+    expect(await rejectedResponse.json()).toMatchObject({
+      error: "jurisdiction_not_applicable",
+      disclaimer: DISCLAIMER,
+    });
+  });
+
+  it("MODULE_COUNTRIES 覆盖全部模块且每个国家集合非空", () => {
+    expect(Object.keys(MODULE_COUNTRIES)).toEqual(ModuleIdSchema.options);
+    for (const countries of Object.values(MODULE_COUNTRIES)) {
+      expect(countries.size).toBeGreaterThan(0);
+    }
   });
 
   it("eu-msb 对任一欧盟成员国 party 受理请求", async () => {

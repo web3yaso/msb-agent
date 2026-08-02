@@ -2,8 +2,8 @@
 
 [English](README.md) | 简体中文
 
-一个确定性、按次付费的 API：对跨境汇款活动核对四个法域（美国 / 英国 / 欧盟 /
-新加坡）的 MSB 监管要求，通过 [x402](https://www.x402.org/) 协议在 Circle Arc
+一个确定性、按次付费的 API：对跨境汇款活动核对五个法域（美国 / 英国 / 欧盟 /
+新加坡 / 阿联酋）的 MSB 监管要求，通过 [x402](https://www.x402.org/) 协议在 Circle Arc
 Testnet 上以测试网 USDC 按次计费。
 
 > **免责声明**：本服务输出为基于公开法源整理的检查项状态，**不构成法律意见**，
@@ -20,8 +20,8 @@ Testnet 上以测试网 USDC 按次计费。
 curl https://msb-agent-production-769d.up.railway.app/modules
 ```
 
-返回四个模块（`us-msb`、`uk-msb`、`eu-msb`、`sg-msb`）的定价、收款地址、法源与
-`input_schema_url`。也可以通过 [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) 身份发现本服务：`GET
+返回五个模块（`us-msb`、`uk-msb`、`eu-msb`、`sg-msb`、`ae-msb`）的定价、收款地址、
+法源与 `input_schema_url`。也可以通过 [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) 身份发现本服务：`GET
 /.well-known/agent-card.json` 已在 Arc Testnet 的 Identity Registry 注册为
 Agent ID `851930`。
 

@@ -62,6 +62,6 @@ describe("smoke shared helpers", () => {
 
   it("共享固定交易输入", () => {
     expect(SMOKE_DEAL_INPUT.deal_id).toBe("arc-testnet-smoke");
-    expect(SMOKE_DEAL_INPUT.parties).toHaveLength(4);
+    expect(SMOKE_DEAL_INPUT.parties).toHaveLength(5);
   });
 });

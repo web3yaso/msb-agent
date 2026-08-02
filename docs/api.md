@@ -33,6 +33,17 @@ settlement orchestration and produces no legal advice.
 | `uk-msb` | United Kingdom                                         | any party with `country = "GB"`             |
 | `eu-msb` | European Union (incl. DE/FR/NL member-state specifics) | any party in one of the 27 EU member states |
 | `sg-msb` | Singapore                                              | any party with `country = "SG"`             |
+| `ae-msb` | United Arab Emirates                                   | any party with `country = "AE"`             |
+
+> **AE crypto/stored-value transactions always `ESCALATE`**: for `ae-msb`, any transaction
+> with `activity = "crypto_transfer"` or `activity = "stored_value"` involving an AE party
+> always has `overall = "ESCALATE"`, regardless of submitted evidence. This is caused by the
+> `ae-payment-token-restrictions` rule (`always_escalate: true`; source: CBUAE Payment Token
+> Services Regulation, Article 12 — Restrictions on Payment Tokens), which routes the "pay-in
+> AED / settle in USDC" gray area to human review instead of guessing. This is the engine's
+> "escalate what rules cannot express" invariant working as intended — **it is not a service
+> malfunction**; purchasers must not interpret a persistent `ESCALATE` on this
+> module/activity combination as a bug report.
 
 **Out of scope**: automated rule updates, multilingual output, KYB/wallet data
 procurement (belongs to Citely F4, a different provider), Jurisdiction Review
@@ -59,13 +70,13 @@ configurable). Current live instance:
 | GET    | `/`                                    | No         | Service directory JSON (name, description, endpoint map, repository)          |
 | GET    | `/healthz`                             | No         | Deployment-platform health check; the only endpoint exempt from rate limiting |
 | GET    | `/static/agent-icon.png`               | No         | Agent card icon image                                                         |
-| GET    | `/modules`                             | No         | Lists the 4 modules' pricing, payee address, legal sources, and version       |
+| GET    | `/modules`                             | No         | Lists the 5 modules' pricing, payee address, legal sources, and version       |
 | GET    | `/modules/:id/schema`                  | No         | JSON Schema for that module's evidence fields                                 |
 | GET    | `/.well-known/agent-card.json`         | No         | ERC-8004 registration-v1 agent card                                           |
 | GET    | `/.well-known/agent-registration.json` | No         | Domain-control proof for a registered identity; `404` if unregistered         |
 | POST   | `/modules/:id/check`                   | Yes (x402) | Submit transaction info, get a deterministic check result                     |
 
-`:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` (`ModuleIdSchema`).
+`:id` ∈ `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` \| `ae-msb` (`ModuleIdSchema`).
 
 Free discovery paths, and the pre-payment validation path on the paid check
 endpoint, are rate limited per client IP with a fixed window, default 60
@@ -111,11 +122,12 @@ Differentiated default pricing per module, overridable via the corresponding
 | `eu-msb` |                    `0.600000` |
 | `uk-msb` |                    `0.400000` |
 | `sg-msb` |                    `0.200000` |
+| `ae-msb` |                    `1.000000` |
 
 Valid price range is `0 < price <= 100`, validated at startup and normalized
 to six decimal places; invalid values immediately abort startup, guarding
 against a misplaced decimal point causing a billing incident. Payee addresses
-are configured via four `{MODULE}_PAY_TO` environment variables — public
+are configured via five `{MODULE}_PAY_TO` environment variables — public
 information that appears in the `GET /modules` response, but is never written
 into code or documentation.
 
@@ -200,8 +212,8 @@ No payment required. Response:
 Field semantics:
 
 - `jurisdiction`: `United States` / `United Kingdom` / `European Union` /
-  `Singapore` (fixed strings, see `MODULE_JURISDICTIONS` in
-  `src/http/constants.ts`);
+  `Singapore` / `United Arab Emirates` (fixed strings, see
+  `MODULE_JURISDICTIONS` in `src/http/constants.ts`);
 - `price_usdc`: sourced from `{MODULE}_PRICE_USDC` or the module's source-code
   default price, normalized to six decimal places; `pay_to` is read directly
   from `{MODULE}_PAY_TO`. Both are public information, **not secrets**;
@@ -510,7 +522,7 @@ The rule fields `when.amount_gte` / `when.monthly_volume_gte` express a
 | `200`  | Validation passed, jurisdiction accepted, (in paid modes) payment succeeded                                                                                                                                                                                                                                    | See `ModuleResponseSchema` above                                                                                                                                                                |
 | `400`  | Request body is not valid JSON, or fails `DealInputSchema` (**not charged**, validated before the x402 middleware)                                                                                                                                                                                             | `{ "error": "invalid_request", "issues": [{ "path": [...], "message": "..." }], "disclaimer": "..." }`                                                                                          |
 | `402`  | Only when `PAYMENT_MODE = x402-base-sepolia` / `x402-arc-testnet`, request carries no valid payment credential                                                                                                                                                                                                 | Standard x402 `PAYMENT-REQUIRED` response header + 402 payload (generated by `@x402/hono`, not custom JSON written by this service — see below)                                                 |
-| `404`  | `:id` is not one of `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb`                                                                                                                                                                                                                                               | `{ "error": "module_not_found", ... }`                                                                                                                                                          |
+| `404`  | `:id` is not one of `us-msb` \| `uk-msb` \| `eu-msb` \| `sg-msb` \| `ae-msb`                                                                                                                                                                                                                                    | `{ "error": "module_not_found", ... }`                                                                                                                                                          |
 | `413`  | Request body exceeds 256KB                                                                                                                                                                                                                                                                                     | `{ "error": "request_too_large", "message": "请求体不得超过 256KB", "disclaimer": "..." }`                                                                                                      |
 | `422`  | Schema validation passed, but **every** party is outside the module's jurisdiction (jurisdiction acceptance boundary: **any** party inside the jurisdiction is accepted; `422` only fires when all parties are outside, to prevent using `422` to bypass the "escalate when rules can't express it" invariant) | `{ "error": "jurisdiction_not_applicable", "message": "全部交易方均不在 <法域> 模块适用法域内", "disclaimer": "..." }`                                                                          |
 | `500`  | Engine evaluation or response serialization throws after payment settlement has succeeded                                                                                                                                                                                                                      | `{ "error": "internal_error", "message": "检查执行失败，可使用同一支付凭证重试", "payment_credential_id": "<sha256(credential)>" (if a payment credential was received), "disclaimer": "..." }` |

@@ -12,6 +12,7 @@ function paidEnvironment(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     UK_MSB_PAY_TO: PAY_TO,
     EU_MSB_PAY_TO: PAY_TO,
     SG_MSB_PAY_TO: PAY_TO,
+    AE_MSB_PAY_TO: PAY_TO,
     ...overrides,
   };
 }
@@ -64,6 +65,7 @@ describe("支付配置", () => {
     expect(config.modules["us-msb"]?.priceAtomic).toBe("800000");
     expect(config.modules["sg-msb"]?.priceAtomic).toBe("200000");
     expect(config.modules["uk-msb"]?.priceAtomic).toBe("2500000");
+    expect(config.modules["ae-msb"]?.priceAtomic).toBe("1000000");
   });
 
   it("统一解析并规范化发现与支付使用的模块价格", () => {
@@ -76,6 +78,9 @@ describe("支付配置", () => {
   it("付费模式缺少收款地址、facilitator 或地址非法时启动失败", () => {
     expect(() => loadPaymentConfig(paidEnvironment({ SG_MSB_PAY_TO: undefined }))).toThrow(
       "SG_MSB_PAY_TO",
+    );
+    expect(() => loadPaymentConfig(paidEnvironment({ AE_MSB_PAY_TO: undefined }))).toThrow(
+      "AE_MSB_PAY_TO",
     );
     expect(() =>
       loadPaymentConfig(paidEnvironment({ X402_BASE_SEPOLIA_FACILITATOR_URL: undefined })),

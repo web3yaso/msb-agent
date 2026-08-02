@@ -15,7 +15,7 @@ describe("版税配置", () => {
     }
   });
 
-  it("全局钱包与费率应用到四模块", () => {
+  it("全局钱包与费率应用到五模块", () => {
     const config = loadRoyaltyConfig(
       { MODULE_MAINTAINER_WALLET: GLOBAL_WALLET, MODULE_ROYALTY_BPS: "500" },
       "off",
@@ -41,6 +41,7 @@ describe("版税配置", () => {
     expect(config["uk-msb"]).toEqual({ maintainerWallet: GLOBAL_WALLET, royaltyBps: 500 });
     expect(config["eu-msb"]).toEqual({ maintainerWallet: GLOBAL_WALLET, royaltyBps: 500 });
     expect(config["sg-msb"]).toEqual({ maintainerWallet: GLOBAL_WALLET, royaltyBps: 500 });
+    expect(config["ae-msb"]).toEqual({ maintainerWallet: GLOBAL_WALLET, royaltyBps: 500 });
   });
 
   it("付费模式缺失维护者钱包时启动失败", () => {
