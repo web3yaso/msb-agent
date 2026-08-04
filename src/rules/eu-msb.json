@@ -1,7 +1,7 @@
 {
   "module": "eu-msb",
-  "version": "2026.07.2",
-  "updated_at": "2026-07-24T21:52:58Z",
+  "version": "2026.08.1",
+  "updated_at": "2026-08-04T00:00:00Z",
   "rules": [
     {
       "id": "eu-psd2-payment-institution-authorisation",
@@ -79,7 +79,7 @@
       "source": "Regulation (EU) 2024/1624 (AMLR)",
       "source_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32024R1624",
       "accessed_date": "2026-07-23",
-      "note": "AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规"
+      "note": "The AMLR is in force but its substantive provisions do not yet apply (they apply from 2027-07-10); this check only flags transition readiness and routes to manual review, and does not present future obligations as current violations"
     },
     {
       "id": "eu-de-bafin-payment-emoney-authorisation",

@@ -1,7 +1,7 @@
 {
   "module": "ae-msb",
-  "version": "2026.08.1",
-  "updated_at": "2026-08-01T00:00:00Z",
+  "version": "2026.08.2",
+  "updated_at": "2026-08-04T00:00:00Z",
   "rules": [
     {
       "id": "ae-cbuae-rps-license",
@@ -97,7 +97,7 @@
       "source": "CBUAE Payment Token Services Regulation, Article (12): Restrictions on Payment Tokens",
       "source_url": "https://rulebook.centralbank.ae/en/rulebook/article-12-restrictions-payment-tokens",
       "accessed_date": "2026-08-01",
-      "note": "USDC 属外币支付代币（Foreign Payment Token），在 UAE 境内作支付用途受 PTSR 限制（原则上限于虚拟资产购买等场景）；纯出境结算是否落入限制属真实灰区，一律上报人工判断——这是对 'pay-in AED, settle in USDC' 场景的诚实处理，不是规则缺陷"
+      "note": "USDC is a Foreign Payment Token; using it for payment within the UAE is restricted under the PTSR (in principle limited to scenarios such as virtual-asset purchases). Whether a pure outbound settlement falls within the restriction is a genuine grey area, so every case is escalated for human judgment — an honest treatment of the 'pay-in AED, settle in USDC' scenario, not a rule defect"
     }
   ]
 }

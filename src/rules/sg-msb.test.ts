@@ -62,7 +62,7 @@ const triggerCases: TriggerCase[] = [
     activity: "crypto_transfer",
     expectedResult: "ESCALATE",
     expectedReason:
-      "Cannot be decided deterministically; manual review required: 2021 修正案自 2024-04-04 起施行并扩展 DPT 服务范围；现有 activity 无法表达代币账户、托管、转移安排、境内外服务对象及过渡豁免，必须转人工核实",
+      "Cannot be decided deterministically; manual review required: The 2021 Amendment Act took effect on 2024-04-04 and broadened the scope of DPT services; the activity field cannot express token accounts, custody, transfer arrangements, onshore/offshore customer bases, or transitional exemptions, so manual verification is required",
   },
 ];
 
@@ -89,7 +89,7 @@ function findCheck(result: ReturnType<typeof evaluate>, ruleId: string) {
 describe("sg-msb 规则文件", () => {
   it("符合规则文件 schema 并携带指定模块版本", () => {
     expect(rulesFile.module).toBe("sg-msb");
-    expect(rulesFile.version).toBe("2026.07.1");
+    expect(rulesFile.version).toBe("2026.08.1");
     expect(rulesFile.rules).toHaveLength(triggerCases.length);
   });
 

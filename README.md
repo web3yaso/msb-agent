@@ -159,10 +159,10 @@ script reference are in [docs/deploy.md](docs/deploy.md).
 | Module   | Jurisdiction         | Rules version | Rules | Default price (testnet USDC) |
 | -------- | -------------------- | ------------- | ----- | ---------------------------- |
 | `us-msb` | United States        | 2026.07.1     | 6     | 0.800000                     |
-| `uk-msb` | United Kingdom       | 2026.07.1     | 6     | 0.400000                     |
-| `eu-msb` | European Union (27)  | 2026.07.2     | 9     | 0.600000                     |
-| `sg-msb` | Singapore            | 2026.07.1     | 5     | 0.200000                     |
-| `ae-msb` | United Arab Emirates | 2026.08.1     | 6     | 1.000000                     |
+| `uk-msb` | United Kingdom       | 2026.08.1     | 6     | 0.400000                     |
+| `eu-msb` | European Union (27)  | 2026.08.1     | 9     | 0.600000                     |
+| `sg-msb` | Singapore            | 2026.08.1     | 5     | 0.200000                     |
+| `ae-msb` | United Arab Emirates | 2026.08.2     | 6     | 1.000000                     |
 
 Each module is gated on jurisdiction: a request is accepted only if at least
 one party's `country` falls in the module's jurisdiction (`US` / `GB` / EU

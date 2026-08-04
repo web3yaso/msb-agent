@@ -84,7 +84,7 @@ const triggerCases: TriggerCase[] = [
     country: "DE",
     expectedResult: "ESCALATE",
     expectedReason:
-      "Cannot be decided deterministically; manual review required: AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规",
+      "Cannot be decided deterministically; manual review required: The AMLR is in force but its substantive provisions do not yet apply (they apply from 2027-07-10); this check only flags transition readiness and routes to manual review, and does not present future obligations as current violations",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -138,7 +138,7 @@ function findCheck(result: ReturnType<typeof evaluate>, ruleId: string) {
 describe("eu-msb 规则文件", () => {
   it("符合规则文件 schema 并携带指定模块版本", () => {
     expect(rulesFile.module).toBe("eu-msb");
-    expect(rulesFile.version).toBe("2026.07.2");
+    expect(rulesFile.version).toBe("2026.08.1");
     expect(rulesFile.rules).toHaveLength(triggerCases.length);
   });
 

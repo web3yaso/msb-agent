@@ -112,7 +112,12 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
     }
 
     if (input.monthly_volume_usdc < rule.when.monthly_volume_gte) {
-      return createCheck(rule, "NOT_APPLICABLE", "deterministic_threshold", "Monthly volume below the rule threshold");
+      return createCheck(
+        rule,
+        "NOT_APPLICABLE",
+        "deterministic_threshold",
+        "Monthly volume below the rule threshold",
+      );
     }
   }
 
@@ -131,7 +136,12 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
   }
 
   if (rule.required_evidence.length === 0) {
-    return createCheck(rule, "ESCALATE", "manual_review", "Rule defines no decidable condition; manual review required");
+    return createCheck(
+      rule,
+      "ESCALATE",
+      "manual_review",
+      "Rule defines no decidable condition; manual review required",
+    );
   }
 
   return createCheck(rule, "PASS", "caller_assertion", "All required evidence provided");
@@ -139,7 +149,12 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
 
 function evaluateRule(rule: Rule, input: DealInput): CheckResult {
   if (!matchesApplicability(input, rule.when)) {
-    return createCheck(rule, "NOT_APPLICABLE", "not_applicable", "Rule conditions not triggered by this deal");
+    return createCheck(
+      rule,
+      "NOT_APPLICABLE",
+      "not_applicable",
+      "Rule conditions not triggered by this deal",
+    );
   }
 
   return evaluateApplicableRule(rule, input);

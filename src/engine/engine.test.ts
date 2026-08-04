@@ -102,7 +102,8 @@ describe("evaluate", () => {
     expect(result.checks[0]).toMatchObject({
       result: "HOLD",
       basis: "insufficient_aggregate_data",
-      reason: "Single transfer below the statutory threshold; aggregate scenarios must be verified by the buyer",
+      reason:
+        "Single transfer below the statutory threshold; aggregate scenarios must be verified by the buyer",
     });
   });
 

@@ -136,7 +136,7 @@ function findCheck(result: ReturnType<typeof evaluate>, ruleId: string) {
 describe("ae-msb 规则文件", () => {
   it("符合规则文件 schema 并携带指定模块版本", () => {
     expect(rulesFile.module).toBe("ae-msb");
-    expect(rulesFile.version).toBe("2026.08.1");
+    expect(rulesFile.version).toBe("2026.08.2");
     expect(rulesFile.rules).toHaveLength(6);
   });
 

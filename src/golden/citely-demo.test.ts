@@ -38,10 +38,10 @@ function getDemoInput(moduleId: ModuleId): typeof CITELY_DEMO_INPUT {
 
 const EXPECTED_EVIDENCE_HASHES: Record<ModuleId, string> = {
   "us-msb": "44bf07506c3ba782b93d8208757737aee4894c0227a47865ca1d34e7b2aa45e4",
-  "uk-msb": "8358d3e2e9abd808a8e117b3f62849bebaa9ec4632c2209aa52d2702bf249e2d",
-  "eu-msb": "1830888a785947fa2910d1818838ca2f83599b5278bdb49b80b1e512bda63d3e",
-  "sg-msb": "0e58bb4cb990e6321963bfb09a8404f54cd0f5f3ab0a13e2264a79ecdae61d00",
-  "ae-msb": "48fe82dd6b6dfe2dd1191638cb6270e548cb361cceefd1674c4bb623836be686",
+  "uk-msb": "abc3cb9c6a5798f9e96a5474b6c3e567aadf2a3a676f4a89394396b87df2e4ff",
+  "eu-msb": "f66fcb973e79db4de2879b9deed1af4dd6405766e440847a6dd43676885d7d9b",
+  "sg-msb": "2d0a52a62a24a432f62f9ba9d29ea4c38cf19ca8dc901dcad4e7d0d0d007cda2",
+  "ae-msb": "073ad09af42c672d6811cb959013e441e4128cf2ca8645348c7b3b2d1a0f50e5",
 };
 
 describe("Citely Demo golden responses", () => {

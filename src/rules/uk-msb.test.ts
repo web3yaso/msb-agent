@@ -67,7 +67,7 @@ const triggerCases: TriggerCase[] = [
     activity: "crypto_transfer",
     expectedResult: "ESCALATE",
     expectedReason:
-      "Cannot be decided deterministically; manual review required: 现有 when 无法表达代币性质、具体受规管活动、豁免和金融推广等监管边界，必须转人工核实",
+      "Cannot be decided deterministically; manual review required: The rule's when-conditions cannot express token characteristics, the specific regulated activity, exemptions, or financial promotion boundaries; manual verification is required",
   },
 ];
 
@@ -91,7 +91,7 @@ function findCheck(result: ReturnType<typeof evaluate>, ruleId: string) {
 describe("uk-msb 规则文件", () => {
   it("符合规则文件 schema 并携带指定模块版本", () => {
     expect(rulesFile.module).toBe("uk-msb");
-    expect(rulesFile.version).toBe("2026.07.1");
+    expect(rulesFile.version).toBe("2026.08.1");
     expect(rulesFile.rules).toHaveLength(triggerCases.length);
   });
 

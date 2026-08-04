@@ -11,6 +11,14 @@
 
 ### 变更
 
+- 4 条 `always_escalate` 规则的 `note` 由中文改为英文（它是唯一会拼进
+  `checks[].reason` 对外输出的 note；其余规则的 note 不外露，未动）。
+  规则文件字节变更，按不变量 4 逐模块 bump version：
+  `uk-msb` / `eu-msb` / `sg-msb` → `2026.08.1`，`ae-msb` → `2026.08.2`，
+  `us-msb` 未动。**4 个模块的 evidence_hash 随规则字节全部轮换**（golden
+  期望值已更新），下游认证清单须按新版本重签。ENGINE_VERSION 不变
+  （引擎代码未动，判定语义无变化）。
+
 - 引擎生成的 `checks[].reason` 文案由中文改为英文（消费方 Deal Desk 的演示 UI
   为英文，混排影响可读性）。**不 bump ENGINE_VERSION 的豁免理由**（架构不变量 6）：
   reason 不在 evidence_hash 预映射内（`canonicalizeChecks` 仅保留

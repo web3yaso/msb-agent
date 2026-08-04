@@ -1,7 +1,7 @@
 {
   "module": "uk-msb",
-  "version": "2026.07.1",
-  "updated_at": "2026-07-24T00:00:00Z",
+  "version": "2026.08.1",
+  "updated_at": "2026-08-04T00:00:00Z",
   "rules": [
     {
       "id": "uk-fca-payment-institution-authorisation",
@@ -97,7 +97,7 @@
       "source": "Financial Services and Markets Act 2000",
       "source_url": "https://www.legislation.gov.uk/ukpga/2000/8",
       "accessed_date": "2026-07-23",
-      "note": "现有 when 无法表达代币性质、具体受规管活动、豁免和金融推广等监管边界，必须转人工核实"
+      "note": "The rule's when-conditions cannot express token characteristics, the specific regulated activity, exemptions, or financial promotion boundaries; manual verification is required"
     }
   ]
 }
