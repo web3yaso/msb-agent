@@ -95,7 +95,7 @@ describe("us-msb 规则文件", () => {
 
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "PASS",
-      reason: "所需证据齐全",
+      reason: "All required evidence provided",
     });
   });
 
@@ -105,7 +105,7 @@ describe("us-msb 规则文件", () => {
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 });

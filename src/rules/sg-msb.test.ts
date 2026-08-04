@@ -36,33 +36,33 @@ const triggerCases: TriggerCase[] = [
     ruleId: "sg-psa-licence-class",
     activity: "money_transmission",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     monthlyVolumeUsdc: 2_320_903.605137,
   },
   {
     ruleId: "sg-mas-register-lookup",
     activity: "currency_exchange",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "sg-psn01-aml-program",
     activity: "money_transmission",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "sg-psn02-dpt-aml-program",
     activity: "crypto_transfer",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "sg-dpt-scope",
     activity: "crypto_transfer",
     expectedResult: "ESCALATE",
     expectedReason:
-      "规则无法确定性判定，需人工核实：2021 修正案自 2024-04-04 起施行并扩展 DPT 服务范围；现有 activity 无法表达代币账户、托管、转移安排、境内外服务对象及过渡豁免，必须转人工核实",
+      "Cannot be decided deterministically; manual review required: 2021 修正案自 2024-04-04 起施行并扩展 DPT 服务范围；现有 activity 无法表达代币账户、托管、转移安排、境内外服务对象及过渡豁免，必须转人工核实",
   },
 ];
 
@@ -108,7 +108,7 @@ describe("sg-msb 规则文件", () => {
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 
@@ -121,7 +121,7 @@ describe("sg-msb 规则文件", () => {
 
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "HOLD",
-      reason: "无法判定分级，需补交易量数据",
+      reason: "Licensing tier cannot be determined; monthly volume data required",
     });
   });
 });

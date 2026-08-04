@@ -88,7 +88,7 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
       rule,
       "ESCALATE",
       "manual_review",
-      `规则无法确定性判定，需人工核实：${rule.note}`,
+      `Cannot be decided deterministically; manual review required: ${rule.note}`,
     );
   }
 
@@ -97,7 +97,7 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
       rule,
       "HOLD",
       "insufficient_aggregate_data",
-      "单笔未达门槛，聚合情形需采购方自行核实",
+      "Single transfer below the statutory threshold; aggregate scenarios must be verified by the buyer",
     );
   }
 
@@ -107,12 +107,12 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
         rule,
         "HOLD",
         "insufficient_aggregate_data",
-        "无法判定分级，需补交易量数据",
+        "Licensing tier cannot be determined; monthly volume data required",
       );
     }
 
     if (input.monthly_volume_usdc < rule.when.monthly_volume_gte) {
-      return createCheck(rule, "NOT_APPLICABLE", "deterministic_threshold", "月交易量未达规则门槛");
+      return createCheck(rule, "NOT_APPLICABLE", "deterministic_threshold", "Monthly volume below the rule threshold");
     }
   }
 
@@ -126,20 +126,20 @@ function evaluateApplicableRule(rule: Rule, input: DealInput): CheckResult {
       rule,
       rule.result_if_missing,
       "missing_evidence",
-      `缺少所需证据：${missingEvidence.join(", ")}`,
+      `Missing required evidence: ${missingEvidence.join(", ")}`,
     );
   }
 
   if (rule.required_evidence.length === 0) {
-    return createCheck(rule, "ESCALATE", "manual_review", "规则未定义任何可判定条件，需人工核实");
+    return createCheck(rule, "ESCALATE", "manual_review", "Rule defines no decidable condition; manual review required");
   }
 
-  return createCheck(rule, "PASS", "caller_assertion", "所需证据齐全");
+  return createCheck(rule, "PASS", "caller_assertion", "All required evidence provided");
 }
 
 function evaluateRule(rule: Rule, input: DealInput): CheckResult {
   if (!matchesApplicability(input, rule.when)) {
-    return createCheck(rule, "NOT_APPLICABLE", "not_applicable", "规则条件未触发");
+    return createCheck(rule, "NOT_APPLICABLE", "not_applicable", "Rule conditions not triggered by this deal");
   }
 
   return evaluateApplicableRule(rule, input);

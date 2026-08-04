@@ -85,7 +85,7 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 
@@ -102,7 +102,7 @@ describe("evaluate", () => {
     expect(result.checks[0]).toMatchObject({
       result: "HOLD",
       basis: "insufficient_aggregate_data",
-      reason: "单笔未达门槛，聚合情形需采购方自行核实",
+      reason: "Single transfer below the statutory threshold; aggregate scenarios must be verified by the buyer",
     });
   });
 
@@ -120,14 +120,14 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "PASS",
       basis: "caller_assertion",
-      reason: "所需证据齐全",
+      reason: "All required evidence provided",
     });
     expect(
       evaluate(rules, { ...baseInput, amount_usdc: 20_001 }, rulesBytes).checks[0],
     ).toMatchObject({
       result: "PASS",
       basis: "caller_assertion",
-      reason: "所需证据齐全",
+      reason: "All required evidence provided",
     });
   });
 
@@ -145,12 +145,12 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "HOLD",
       basis: "insufficient_aggregate_data",
-      reason: "无法判定分级，需补交易量数据",
+      reason: "Licensing tier cannot be determined; monthly volume data required",
     });
     expect(evaluate(rules, baseInput, encodeRules(rules)).checks[0]).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "deterministic_threshold",
-      reason: "月交易量未达规则门槛",
+      reason: "Monthly volume below the rule threshold",
     });
   });
 
@@ -166,7 +166,7 @@ describe("evaluate", () => {
     expect(evaluate(rules, baseInput, encodeRules(rules)).checks[0]).toMatchObject({
       result: "ESCALATE",
       basis: "manual_review",
-      reason: "规则未定义任何可判定条件，需人工核实",
+      reason: "Rule defines no decidable condition; manual review required",
     });
   });
 
@@ -184,7 +184,7 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "PASS",
       basis: "caller_assertion",
-      reason: "所需证据齐全",
+      reason: "All required evidence provided",
     });
     expect(
       evaluate(
@@ -199,7 +199,7 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "HOLD",
       basis: "missing_evidence",
-      reason: "缺少所需证据：fincen_registration",
+      reason: "Missing required evidence: fincen_registration",
     });
   });
 
@@ -232,7 +232,7 @@ describe("evaluate", () => {
     expect(evaluate(rules, baseInput, encodeRules(rules)).checks[0]).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 
@@ -247,7 +247,7 @@ describe("evaluate", () => {
 
     expect(evaluate(rules, baseInput, rulesBytes).checks[0]).toMatchObject({
       result: "PASS",
-      reason: "所需证据齐全",
+      reason: "All required evidence provided",
     });
     expect(
       evaluate(
@@ -264,7 +264,7 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 
@@ -281,7 +281,7 @@ describe("evaluate", () => {
     ).toMatchObject({
       result: "HOLD",
       basis: "missing_evidence",
-      reason: "缺少所需证据：toString",
+      reason: "Missing required evidence: toString",
     });
   });
 

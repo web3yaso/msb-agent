@@ -44,38 +44,38 @@ const triggerCases: TriggerCase[] = [
     ruleId: "ae-cbuae-rps-license",
     activity: "money_transmission",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "ae-aml-cft-program",
     activity: "check_cashing",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "ae-goaml-registration",
     activity: "currency_exchange",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "ae-wire-transfer-information",
     activity: "money_transmission",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "ae-vasp-license-path",
     activity: "crypto_transfer",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "ae-payment-token-restrictions",
     activity: "crypto_transfer",
     expectedResult: "ESCALATE",
     expectedBasis: "manual_review",
-    expectedReason: `规则无法确定性判定，需人工核实：${paymentTokenRule.note}`,
+    expectedReason: `Cannot be decided deterministically; manual review required: ${paymentTokenRule.note}`,
   },
 ];
 
@@ -160,7 +160,7 @@ describe("ae-msb 规则文件", () => {
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 
@@ -170,7 +170,7 @@ describe("ae-msb 规则文件", () => {
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: testCase.expectedResult,
       basis: "missing_evidence",
-      reason: `缺少所需证据：${testCase.evidenceKey}`,
+      reason: `Missing required evidence: ${testCase.evidenceKey}`,
     });
   });
 

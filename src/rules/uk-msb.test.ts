@@ -36,38 +36,38 @@ const triggerCases: TriggerCase[] = [
     ruleId: "uk-fca-payment-institution-authorisation",
     activity: "money_transmission",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "uk-fca-emoney-authorisation",
     activity: "stored_value",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "uk-hmrc-aml-supervision",
     activity: "currency_exchange",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "uk-mlr-policies-controls",
     activity: "check_cashing",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "uk-poca-sar-controls",
     activity: "money_transmission",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
   },
   {
     ruleId: "uk-crypto-regulatory-perimeter",
     activity: "crypto_transfer",
     expectedResult: "ESCALATE",
     expectedReason:
-      "规则无法确定性判定，需人工核实：现有 when 无法表达代币性质、具体受规管活动、豁免和金融推广等监管边界，必须转人工核实",
+      "Cannot be decided deterministically; manual review required: 现有 when 无法表达代币性质、具体受规管活动、豁免和金融推广等监管边界，必须转人工核实",
   },
 ];
 
@@ -110,7 +110,7 @@ describe("uk-msb 规则文件", () => {
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 });

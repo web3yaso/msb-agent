@@ -9,6 +9,16 @@
 
 对应设计：`docs/design/2026-08-01-ae-msb-module.md`。
 
+### 变更
+
+- 引擎生成的 `checks[].reason` 文案由中文改为英文（消费方 Deal Desk 的演示 UI
+  为英文，混排影响可读性）。**不 bump ENGINE_VERSION 的豁免理由**（架构不变量 6）：
+  reason 不在 evidence_hash 预映射内（`canonicalizeChecks` 仅保留
+  `{id, result, basis}`），且任何合法输入下新旧引擎的 checks 判定结果逐字节相同——
+  golden 快照重生成后全部 `evidence_hash` 零变化（`git diff` 可核）。
+  `always_escalate` 规则的 reason 前缀已英文化，但其拼接的 `rule.note` 仍为中文——
+  翻译 note 需改规则文件字节，触发模块 version bump 与认证清单重签，单独排期。
+
 ### 新增
 
 - 新增第 5 个法域模块 `ae-msb`（阿联酋，United Arab Emirates），版本 `2026.08.1`，

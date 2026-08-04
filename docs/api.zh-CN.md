@@ -348,42 +348,42 @@ evidence}` 按本项目自有的 JSON 规范化规则处理（不是 RFC 8785 JC
       "id": "us-fincen-registration-money-transmission",
       "result": "HOLD",
       "basis": "missing_evidence",
-      "reason": "缺少所需证据：fincen_msb_registration",
+      "reason": "Missing required evidence: fincen_msb_registration",
       "source": "31 CFR § 1022.380"
     },
     {
       "id": "us-fincen-registration-threshold-activities",
       "result": "NOT_APPLICABLE",
       "basis": "not_applicable",
-      "reason": "规则条件未触发",
+      "reason": "Rule conditions not triggered by this deal",
       "source": "31 CFR § 1010.100(ff)"
     },
     {
       "id": "us-bsa-aml-program",
       "result": "HOLD",
       "basis": "missing_evidence",
-      "reason": "缺少所需证据：bsa_aml_program",
+      "reason": "Missing required evidence: bsa_aml_program",
       "source": "31 CFR § 1022.210"
     },
     {
       "id": "us-sar-controls",
       "result": "HOLD",
       "basis": "missing_evidence",
-      "reason": "缺少所需证据：sar_monitoring_and_filing_controls",
+      "reason": "Missing required evidence: sar_monitoring_and_filing_controls",
       "source": "31 CFR § 1022.320"
     },
     {
       "id": "us-ny-money-transmitter-license",
       "result": "HOLD",
       "basis": "missing_evidence",
-      "reason": "缺少所需证据：ny_money_transmitter_license",
+      "reason": "Missing required evidence: ny_money_transmitter_license",
       "source": "NY Banking Law Article 13-B"
     },
     {
       "id": "us-ny-bitlicense",
       "result": "NOT_APPLICABLE",
       "basis": "not_applicable",
-      "reason": "规则条件未触发",
+      "reason": "Rule conditions not triggered by this deal",
       "source": "23 NYCRR Part 200"
     }
   ],
@@ -417,7 +417,7 @@ evidence}` 按本项目自有的 JSON 规范化规则处理（不是 RFC 8785 JC
 {
   "id": "eu-amlr-2027-applicability",
   "result": "ESCALATE",
-  "reason": "规则无法确定性判定，需人工核实：AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规",
+  "reason": "Cannot be decided deterministically; manual review required: AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规",
   "source": "Regulation (EU) 2024/1624 (AMLR)"
 }
 ```
@@ -433,11 +433,11 @@ evidence}` 按本项目自有的 JSON 规范化规则处理（不是 RFC 8785 JC
   法源门槛多为聚合口径（如美国货币兑换 $1,000/人/日累计），单笔 ≥ 门槛可以安全推出
   聚合必然 ≥ 门槛，但**单笔 < 门槛不能推出聚合 < 门槛**，因此规则条件"未触发"时
   仍输出 `HOLD`（`basis: "insufficient_aggregate_data"`，
-  `reason: "单笔未达门槛，聚合情形需采购方自行核实"`），**不输出 `PASS`**；
+  `reason: "Single transfer below the statutory threshold; aggregate scenarios must be verified by the buyer"`），**不输出 `PASS`**；
 - `monthly_volume_gte` 依赖可选字段 `monthly_volume_usdc`：缺失（`undefined` 或
-  `null`）→ 相关检查项 `HOLD`，`reason: "无法判定分级，需补交易量数据"`；达到该字段
+  `null`）→ 相关检查项 `HOLD`，`reason: "Licensing tier cannot be determined; monthly volume data required"`；达到该字段
   但低于门槛 → `NOT_APPLICABLE`，`basis: "deterministic_threshold"`，
-  `reason: "月交易量未达规则门槛"`；
+  `reason: "Monthly volume below the rule threshold"`；
 - 币种统一假设 USDC ≈ USD；非美元法源门槛（如新加坡 SGD）在规则文件里写死换算后的
   USDC 门槛值，`note` 字段标注换算汇率与换算日期，引擎内部不做隐式汇率换算。
 

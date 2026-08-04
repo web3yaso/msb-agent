@@ -43,7 +43,7 @@ const triggerCases: TriggerCase[] = [
     activity: "money_transmission",
     country: "DE",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -51,7 +51,7 @@ const triggerCases: TriggerCase[] = [
     activity: "stored_value",
     country: "DE",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -59,7 +59,7 @@ const triggerCases: TriggerCase[] = [
     activity: "currency_exchange",
     country: "FR",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -67,7 +67,7 @@ const triggerCases: TriggerCase[] = [
     activity: "crypto_transfer",
     country: "NL",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -75,7 +75,7 @@ const triggerCases: TriggerCase[] = [
     activity: "money_transmission",
     country: "FR",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -84,7 +84,7 @@ const triggerCases: TriggerCase[] = [
     country: "DE",
     expectedResult: "ESCALATE",
     expectedReason:
-      "规则无法确定性判定，需人工核实：AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规",
+      "Cannot be decided deterministically; manual review required: AMLR 已生效但主体条款尚未适用，将自 2027-07-10 起适用；本项仅提示过渡准备并转人工，不把未来条款表述为当前违规",
     nonTriggerActivity: "check_cashing",
   },
   {
@@ -92,7 +92,7 @@ const triggerCases: TriggerCase[] = [
     activity: "money_transmission",
     country: "DE",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerCountry: "US",
   },
   {
@@ -100,7 +100,7 @@ const triggerCases: TriggerCase[] = [
     activity: "money_transmission",
     country: "FR",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerCountry: "US",
   },
   {
@@ -108,7 +108,7 @@ const triggerCases: TriggerCase[] = [
     activity: "stored_value",
     country: "NL",
     expectedResult: "PASS",
-    expectedReason: "所需证据齐全",
+    expectedReason: "All required evidence provided",
     nonTriggerCountry: "US",
   },
 ];
@@ -157,7 +157,7 @@ describe("eu-msb 规则文件", () => {
     expect(findCheck(result, testCase.ruleId)).toMatchObject({
       result: "NOT_APPLICABLE",
       basis: "not_applicable",
-      reason: "规则条件未触发",
+      reason: "Rule conditions not triggered by this deal",
     });
   });
 });
